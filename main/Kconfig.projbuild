@@ -1,0 +1,26 @@
+menu "MiGroBox GPIO RELAY Configuration"
+
+    config LIGHT_RELAY_GPIO
+        int "Light relay GPIO number"
+        range 0 34
+        default 5
+        help
+            GPIO number (IOxx) to turn on and off.
+
+            Some GPIOs are used for other purposes (flash connections, etc.) and cannot be used to control relays.
+
+            GPIOs 35-39 are input-only so cannot be used as outputs.
+    
+    config PUMP_RELAY_GPIO
+        int "Pump relay GPIO number"
+        range 0 34
+        default 5
+        help
+            GPIO number (IOxx) to turn on and off.
+
+            Some GPIOs are used for other purposes (flash connections, etc.) and cannot be used to control relays.
+
+            GPIOs 35-39 are input-only so cannot be used as outputs.
+
+
+endmenu

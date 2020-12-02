@@ -1,0 +1,20 @@
+{
+    "project_name":       "bootloader",
+    "project_path":       "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/bootloader/subproject",
+    "build_dir":          "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/bootloader",
+    "config_file":        "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/sdkconfig",
+    "config_defaults":    "",
+    "app_elf":            "bootloader.elf",
+    "app_bin":            "bootloader.bin",
+    "git_revision":       "v4.3-dev-1901-g178b122c1",
+    "target":             "esp32s2",
+    "phy_data_partition": "",
+    "monitor_baud" :      "115200",
+    "monitor_toolprefix": "xtensa-esp32s2-elf-",
+    "config_environment" : {
+        "COMPONENT_KCONFIGS" : "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/efuse/Kconfig;/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/esp32s2/Kconfig;/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/esp_common/Kconfig;/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/log/Kconfig;/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/spi_flash/Kconfig",
+        "COMPONENT_KCONFIGS_PROJBUILD" : "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/bootloader/Kconfig.projbuild;/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/esptool_py/Kconfig.projbuild;/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/partition_table/Kconfig.projbuild"
+    },
+    "build_components" : [ "bootloader", "bootloader_support", "efuse", "esp32s2", "esp_common", "esp_hw_support", "esp_rom", "esptool_py", "hal", "log", "main", "micro-ecc", "partition_table", "soc", "spi_flash", "xtensa", "" ],
+    "build_component_paths" : [ "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/bootloader", "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/bootloader_support", "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/efuse", "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/esp32s2", "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/esp_common", "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/esp_hw_support", "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/esp_rom", "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/esptool_py", "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/hal", "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/log", "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/bootloader/subproject/main", "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/bootloader/subproject/components/micro-ecc", "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/partition_table", "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/soc", "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/spi_flash", "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/xtensa", "" ]
+}
