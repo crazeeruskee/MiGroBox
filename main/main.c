@@ -29,10 +29,18 @@
 /* A simple example that demonstrates how to create GET and POST
  * handlers for the web server.
  */
-#define DECIMAL 10
+#define DECIMAL       10
 
 #define PUMP_GPIO CONFIG_PUMP_RELAY_GPIO
 #define LIGHT_GPIO CONFIG_LIGHT_RELAY_GPIO
+
+#define Z_DIR_GPIO   10
+#define Z_STEP_GPIO  11
+#define Z_EN_GPIO    12
+
+#define Y_DIR_GPIO   13
+#define Y_STEP_GPIO  14
+#define Y_EN_GPIO    15
 
 static const char *TAG = "example";
 int lights_value;
@@ -42,11 +50,53 @@ int fan_2_value;
 int temperature_value;
 int humidity_value;
 
+int z_distance;
+
+const int steps_per_rev = 200;
+
 void setup_gpio(){
     gpio_reset_pin(PUMP_GPIO);
-    gpio_reset_pin(LIGHT_GPIO);
     gpio_set_direction(PUMP_GPIO, GPIO_MODE_OUTPUT);
+    gpio_reset_pin(LIGHT_GPIO); 
     gpio_set_direction(LIGHT_GPIO, GPIO_MODE_OUTPUT);
+    
+    gpio_reset_pin(Z_DIR_GPIO);
+    gpio_set_direction(Z_DIR_GPIO, GPIO_MODE_OUTPUT);
+    gpio_reset_pin(Z_STEP_GPIO); 
+    gpio_set_direction(Z_STEP_GPIO, GPIO_MODE_OUTPUT);
+    gpio_reset_pin(Z_EN_GPIO); 
+    gpio_set_direction(Z_EN_GPIO, GPIO_MODE_OUTPUT);
+    gpio_reset_pin(Y_DIR_GPIO); 
+    gpio_set_direction(Y_DIR_GPIO, GPIO_MODE_OUTPUT);
+    gpio_reset_pin(Y_STEP_GPIO); 
+    gpio_set_direction(Y_STEP_GPIO, GPIO_MODE_OUTPUT);
+    gpio_reset_pin(Y_EN_GPIO); 
+    gpio_set_direction(Y_EN_GPIO, GPIO_MODE_OUTPUT);
+}
+
+void enable_stepper_drivers(){
+    gpio_set_level(Z_EN_GPIO, 1);
+    gpio_set_level(Y_EN_GPIO, 1);
+}
+
+void disable_stepper_drivers(){
+    gpio_set_level(Z_EN_GPIO, 0);
+    gpio_set_level(Y_EN_GPIO, 0);
+}
+
+void tick_z_stepper(int dir, int dist, int speed_ms){
+    //Enable Z stepper driver
+    enable_stepper_drivers();
+
+    //Set z stepper direction
+    gpio_set_level(Z_DIR_GPIO, dir);
+
+    for(int i = 0; i < dist; i++){
+        gpio_set_level(Z_STEP_GPIO, 1);
+        vTaskDelay(speed_ms / portTICK_PERIOD_MS);
+        gpio_set_level(Z_STEP_GPIO, 0);
+        vTaskDelay(speed_ms / portTICK_PERIOD_MS); 
+    }
 }
 
 /* An HTTP GET handler */
@@ -132,9 +182,21 @@ static esp_err_t get_handler(httpd_req_t *req)
         } else {
             ESP_LOGI(TAG, "INVALID FAN_2 INPUT, CHOOSE VALUE BETWEEN -1 and 255"); 
         }
-    } else{
-        device_selected = false;
-        ESP_LOGI(TAG, "INVALID DEVICE INPUT");
+    } else if(strcmp(device, "z_stepper") == 0){
+        ESP_LOGI(TAG, "Z stepper motor command found...");
+        if (device_value == -1){
+            device_value = z_distance;
+            itoa(device_value, device_value_str, DECIMAL);
+        } else if (device_value >= 0 && device_value <= 1000){
+            z_distance = device_value;
+            tick_z_stepper(1, z_distance, 500);    
+        } else {
+            ESP_LOGI(TAG, "INVALID Z STEPPER INPUT, CHOOSE VALUE BETWEEN -1 and  1000"); 
+        } 
+    }
+    else{
+            device_selected = false;
+            ESP_LOGI(TAG, "INVALID DEVICE INPUT");
     }
     
     if (read_device){
