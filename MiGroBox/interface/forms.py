@@ -4,8 +4,9 @@ write_choices = [
   ('fan_1', 'Fan 1'),
   ('fan_2', 'Fan 2'),
   ('lights', 'Lights'),
-  ('motor', 'Motor'),
   ('pump', 'Water Pump'),
+  ('z_stepper', 'Z Stepper Motor'),
+  ('y_stepper', 'Y Stepper Motor'),
 ]
 
 read_choices = [
