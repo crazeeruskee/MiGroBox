@@ -1,0 +1,39 @@
+{% load static %}
+
+<link rel="stylesheet" type="text/css" href="{% static 'interface/style.css' %}">
+
+<div class="row">
+<div class = "column">
+<h1> Actuation </h1>
+
+<form method="post" action="{%url 'index' %}">
+  <table>
+    {% for field in w_form.visible_fields %}
+      <tr>
+        <td>{{field.label_tag}}</td>
+        <td>{{field}}</td>
+      <tr>
+    {% endfor %}
+    {% csrf_token %}
+  </table>
+  <button type="submit">Submit</button>
+</form>
+</div>
+<div class = "column">
+<h1>Sensing</h1>
+
+<form method="post" action="{%url 'index' %}">
+  <table>
+    {% for field in r_form.visible_fields %}
+      <tr>
+        <td>{{field.label_tag}}</td>
+        <td>{{field}}</td>
+      <tr>
+    {% endfor %}
+    {% csrf_token %}
+  </table>
+  <button type="submit">Submit</button>
+</form>
+</div>
+</div>
+Received  response: {{response}}

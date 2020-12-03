@@ -1,0 +1,41 @@
+{% load static %}
+
+<link rel="stylesheet" type="text/css" href="{% static 'interface/style.css' %}">
+<script src="{% static 'interface/script.js' %}"></script>
+
+<!doctype html>
+<html>
+
+  <head>
+    <meta charset="UTF-8">
+    <title>MiGroBox Web Interface</title>
+  </head>
+
+  <body>
+
+    <div class="row">
+      <span class="digit" id="calc-display">(display)</span>
+    </div>
+    <div class="row">
+      <span id="calc-key-7" class="digit" onclick="print_disp('The internal temperature is {{test}}.')">Read Temperature</span>
+    </div>
+    <div class="row">
+      <span id="calc-key-4" class="digit" onclick="print_disp('The light level is VALUE.')">Read Light Level</span>
+    </div>
+    <div class="row">
+      <span id="calc-key-1" class="digit" onclick="print_disp('The motor has been set to VALUE')">Set Motor Position</span>
+    </div>
+    <div class="row">
+      <span id="calc-key-1" class="digit" onclick="print_disp('The light has been set to VALUE')">Set Light Level</span>
+    </div>
+    <div class="row">
+      <span id="calc-key-1" class="digit" onclick="print_disp('Running irrigation cycle')">Water Plants</span>
+    </div>
+    <div class="row">
+      <span id="calc-equals" onclick="print_disp('Automatic Mode enabled')">Auto Mode</span>
+    </div>
+
+
+  </body>
+
+</html>
