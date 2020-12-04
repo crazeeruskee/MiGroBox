@@ -18,12 +18,12 @@
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "sdkconfig.h"
 #include "driver/ledc.h"
 #include "esp_err.h"
 
-//it's lit
 /* MiGroBox ESP32s2 code - ECE Capstone Fall 2020 
   
     - Runs web server to handle http GET requests
@@ -48,13 +48,20 @@
 
 #define Z_PWM_LS_CH0_GPIO       (11)
 #define Z_PWM_LS_CH0_CHANNEL    LEDC_CHANNEL_0
-//#define Y_PWM_LS_CH1_GPIO       (14)
-//#define Y_PWM_LS_CH1_CHANNEL    LEDC_CHANNEL_1
+#define Y_PWM_LS_CH1_GPIO       (14)
+#define Y_PWM_LS_CH1_CHANNEL    LEDC_CHANNEL_1
 
 #define PWM_CH_NUM             (1)
 #define PWM_TIMER_FREQ         (1000)
 #define PWM_TEST_DUTY          (1024)
 #define PWM_TEST_FADE_TIME     (800)
+
+#define Z_ENDSTOP_GPIO         33
+#define Y_ENDSTOP_GPIO         34
+#define ENDSTOP_GPIO_PIN_SEL   ((1ULL<<Z_ENDSTOP_GPIO) | (1ULL<<Y_ENDSTOP_GPIO))
+
+#define ESP_INTR_FLAG_DEFAULT  0
+
 
 static const char *TAG = "example";
 
@@ -76,14 +83,46 @@ const int y_lower_bound = -2000;
 const int y_upper_bound = 2000;
 
 ledc_channel_config_t z_pwm_channel; 
-//ledc_channel_config_t y_pwm_channel;
+ledc_channel_config_t y_pwm_channel;
 
-void setup_gpio(){
+static xQueueHandle gpio_evt_queue = NULL;
+
+static void IRAM_ATTR gpio_isr_handler(void* arg){
+    uint32_t gpio_num = (uint32_t) arg;
+    //xQueueGenericSendFromISR(gpio_evt_quque, &gpio_num, NULL)
+    xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
+}
+
+static void z_endstop_task(void* arg){
+    uint32_t io_num;
+    //Loop forever, same as while(1)
+    for(;;){
+        if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)){
+            ledc_stop(z_pwm_channel.speed_mode, z_pwm_channel.channel, 0);
+            ESP_LOGI(TAG, "Z ENDSTOP HIT, Z MOTOR STOPPED!");
+        }
+    }
+}
+
+static void y_endstop_task(void* arg){
+    uint32_t io_num;
+    //Loop forever, same as while(1)
+    for(;;){
+        if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)){
+            ledc_stop(y_pwm_channel.speed_mode, y_pwm_channel.channel, 0);
+            ESP_LOGI(TAG, "Y ENDSTOP HIT, Y MOTOR STOPPED!");
+        }
+    }
+}
+
+void setup_gpio(){   
+    //Relay Peripherals
     gpio_reset_pin(PUMP_GPIO);
     gpio_set_direction(PUMP_GPIO, GPIO_MODE_OUTPUT);
     gpio_reset_pin(LIGHT_GPIO); 
     gpio_set_direction(LIGHT_GPIO, GPIO_MODE_OUTPUT);
     
+    //CNC Stepper Motors
     gpio_reset_pin(Z_DIR_GPIO);
     gpio_set_direction(Z_DIR_GPIO, GPIO_MODE_OUTPUT);
     //gpio_reset_pin(Z_STEP_GPIO); 
@@ -96,6 +135,48 @@ void setup_gpio(){
     gpio_set_direction(Y_STEP_GPIO, GPIO_MODE_OUTPUT);
     gpio_reset_pin(Y_EN_GPIO); 
     gpio_set_direction(Y_EN_GPIO, GPIO_MODE_OUTPUT);
+
+    //CNC Endstops
+    gpio_config_t io_conf;
+    //interrupt of rising edge
+    io_conf.intr_type = GPIO_INTR_NEGEDGE;
+    //bit mask of the pins, use GPIO4/5 here
+    io_conf.pin_bit_mask = ENDSTOP_GPIO_PIN_SEL;
+    //set as input mode
+    io_conf.mode = GPIO_MODE_INPUT;
+    //enable pull-up mode
+    io_conf.pull_up_en = 1;
+    gpio_config(&io_conf);
+
+    //create a queue to handle gpio event from isr
+    gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+    
+    //create endstop task
+    //BaseType_t xReturned_z_endstop;
+    TaskHandle_t xHandle_z_endstop = xTaskCreate(z_endstop_task, "z_endstop_task", 2048, NULL, 1, NULL);
+
+    //create endstop task
+    //BaseType_t xReturned_y_endstop;
+    TaskHandle_t xHandle_y_endstop = xTaskCreate(y_endstop_task, "y_endstop_task", 2048, NULL, 1, NULL);
+
+
+    //install gpio isr service
+    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+    //hook isr handler for specific gpio pin
+    gpio_isr_handler_add(Z_ENDSTOP_GPIO, gpio_isr_handler, (void*) Z_ENDSTOP_GPIO);
+    //hook isr handler for specific gpio pin
+    gpio_isr_handler_add(Y_ENDSTOP_GPIO, gpio_isr_handler, (void*) Y_ENDSTOP_GPIO);
+
+
+
+/*
+    gpio_reset_pin(Z_ENDSTOP_GPIO); 
+    gpio_set_direction(Z_ENDSTOP_GPIO, GPIO_MODE_OUTPUT);
+    gpio_reset_pin(Y_ENDSTOP_GPIO); 
+    gpio_set_direction(Y_ENDSTOP_GPIO, GPIO_MODE_OUTPUT);
+*/
+
+
 }
 
 void pwm_config(){
@@ -134,7 +215,7 @@ void pwm_config(){
         .hpoint     = 0,
         .timer_sel  = PWM_LS_TIMER
     };
-/*
+
     y_pwm_channel = (ledc_channel_config_t){
         .channel    = Y_PWM_LS_CH1_CHANNEL,
         .duty       = 0,
@@ -143,13 +224,13 @@ void pwm_config(){
         .hpoint     = 0,
         .timer_sel  = PWM_LS_TIMER
     };
-*/
+
     // Set LED Controller with previously prepared configuration
     ledc_channel_config(&z_pwm_channel);
   //  ledc_channel_config(&y_pwm_channel);
 
     // Initialize fade service.
-  //   ledc_fade_func_install(0);
+     ledc_fade_func_install(0);
 }
 
 void enable_z_stepper_driver(){
@@ -183,8 +264,10 @@ void tick_z_stepper(int dist, int speed_ms){
     ledc_fade_start(ledc_channel[ch].speed_mode, ledc_channel[ch].channel, LEDC_FADE_NO_WAIT);
     */
     
-    ledc_set_duty(z_pwm_channel.speed_mode, z_pwm_channel.channel, PWM_TEST_DUTY);
-    ledc_update_duty(z_pwm_channel.speed_mode, z_pwm_channel.channel);
+   // ledc_set_duty(z_pwm_channel.speed_mode, z_pwm_channel.channel, PWM_TEST_DUTY);
+   // ledc_update_duty(z_pwm_channel.speed_mode, z_pwm_channel.channel);
+
+    ledc_set_duty_and_update(z_pwm_channel.speed_mode, z_pwm_channel.channel, PWM_TEST_DUTY, z_pwm_channel.hpoint);
 /*
     for(int i = 0; i < abs(dist); i++){
         gpio_set_level(Z_STEP_GPIO, 1);
@@ -205,13 +288,22 @@ void tick_y_stepper(int dist, int speed_ms){
     //Set Y stepper direction
     if(dist < 0) gpio_set_level(Y_DIR_GPIO, 1);
     else gpio_set_level(Y_DIR_GPIO, 0);
- 
+/* 
     for(int i = 0; i < abs(dist); i++){
         gpio_set_level(Y_STEP_GPIO, 1);
         vTaskDelay(speed_ms / portTICK_PERIOD_MS);
         gpio_set_level(Y_STEP_GPIO, 0);
         vTaskDelay(speed_ms / portTICK_PERIOD_MS); 
     }
+
+*/ 
+
+ 
+  //  ledc_set_duty(y_pwm_channel.speed_mode, y_pwm_channel.channel, PWM_TEST_DUTY);
+  //  ledc_update_duty(y_pwm_channel.speed_mode, y_pwm_channel.channel);
+
+
+    ledc_set_duty_and_update(y_pwm_channel.speed_mode, y_pwm_channel.channel, PWM_TEST_DUTY, y_pwm_channel.hpoint);
 
     disable_y_stepper_driver();
 }
@@ -271,7 +363,7 @@ static esp_err_t get_handler(httpd_req_t *req)
             itoa(device_value, device_value_str, DECIMAL);
         } else if (device_value == 0 || device_value == 1){
             pump_value = device_value;
-            gpio_set_level(PUMP_GPIO, device_value);
+            gpio_set_level(PUMP_GPIO, 0x1 ^ device_value);
         } else {
             ESP_LOGI(TAG, "INVALID PUMP INPUT, CHOOSE -1, 0, OR 1"); 
         }
@@ -540,17 +632,11 @@ void app_main(void)
      */
     ESP_ERROR_CHECK(example_connect());
 
-    /* Register event handlers to stop the server when Wi-Fi or Ethernet is disconnected,
+    /* Register event handlers to stop the server when Wi-Fi is disconnected,
      * and re-start it upon connection.
      */
-#ifdef CONFIG_EXAMPLE_CONNECT_WIFI
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &connect_handler, &server));
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &disconnect_handler, &server));
-#endif // CONFIG_EXAMPLE_CONNECT_WIFI
-#ifdef CONFIG_EXAMPLE_CONNECT_ETHERNET
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &connect_handler, &server));
-    ESP_ERROR_CHECK(esp_event_handler_register(ETH_EVENT, ETHERNET_EVENT_DISCONNECTED, &disconnect_handler, &server));
-#endif // CONFIG_EXAMPLE_CONNECT_ETHERNET
 
     /* Start the server for the first time */
     server = start_webserver();
