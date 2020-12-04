@@ -23,7 +23,7 @@
 #include "driver/ledc.h"
 #include "esp_err.h"
 
-
+//it's lit
 /* MiGroBox ESP32s2 code - ECE Capstone Fall 2020 
   
     - Runs web server to handle http GET requests
