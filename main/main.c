@@ -1,11 +1,9 @@
-/* MiGroBox ESP32s2 code - ECE Capstone Fall 2020 
-   
-   Based off of: 
-   - Simple HTTP Server Example
-   - Blink Example
-
-*/
-
+/* 
+ * Author(s):         Lucas Moiseyev
+ * Date Created:      11/30/20
+ * Date Last Updated: 12/4/20
+ *
+ */
 #include <esp_wifi.h>
 #include <esp_event.h>
 #include <esp_log.h>
@@ -16,19 +14,22 @@
 #include "esp_netif.h"
 #include "esp_eth.h"
 #include "protocol_examples_common.h"
-
 #include <esp_http_server.h>
-
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/gpio.h"
 #include "sdkconfig.h"
+#include "driver/ledc.h"
+#include "esp_err.h"
 
 
-/* A simple example that demonstrates how to create GET and POST
- * handlers for the web server.
- */
+/* MiGroBox ESP32s2 code - ECE Capstone Fall 2020 
+  
+    - Runs web server to handle http GET requests
+    - Controls stepper drivers
+    - Controls power relays
+*/
 #define DECIMAL       10
 
 #define PUMP_GPIO CONFIG_PUMP_RELAY_GPIO
@@ -42,7 +43,21 @@
 #define Y_STEP_GPIO  14
 #define Y_EN_GPIO    15
 
+#define PWM_LS_TIMER            LEDC_TIMER_0
+#define PWM_LS_MODE             LEDC_LOW_SPEED_MODE
+
+#define Z_PWM_LS_CH0_GPIO       (11)
+#define Z_PWM_LS_CH0_CHANNEL    LEDC_CHANNEL_0
+//#define Y_PWM_LS_CH1_GPIO       (14)
+//#define Y_PWM_LS_CH1_CHANNEL    LEDC_CHANNEL_1
+
+#define PWM_CH_NUM             (1)
+#define PWM_TIMER_FREQ         (1000)
+#define PWM_TEST_DUTY          (1024)
+#define PWM_TEST_FADE_TIME     (800)
+
 static const char *TAG = "example";
+
 int lights_value;
 int pump_value;
 int fan_1_value;
@@ -60,6 +75,9 @@ const int y_speed = 10;
 const int y_lower_bound = -2000;
 const int y_upper_bound = 2000;
 
+ledc_channel_config_t z_pwm_channel; 
+//ledc_channel_config_t y_pwm_channel;
+
 void setup_gpio(){
     gpio_reset_pin(PUMP_GPIO);
     gpio_set_direction(PUMP_GPIO, GPIO_MODE_OUTPUT);
@@ -68,8 +86,8 @@ void setup_gpio(){
     
     gpio_reset_pin(Z_DIR_GPIO);
     gpio_set_direction(Z_DIR_GPIO, GPIO_MODE_OUTPUT);
-    gpio_reset_pin(Z_STEP_GPIO); 
-    gpio_set_direction(Z_STEP_GPIO, GPIO_MODE_OUTPUT);
+    //gpio_reset_pin(Z_STEP_GPIO); 
+    //gpio_set_direction(Z_STEP_GPIO, GPIO_MODE_OUTPUT);
     gpio_reset_pin(Z_EN_GPIO); 
     gpio_set_direction(Z_EN_GPIO, GPIO_MODE_OUTPUT);
     gpio_reset_pin(Y_DIR_GPIO); 
@@ -78,6 +96,60 @@ void setup_gpio(){
     gpio_set_direction(Y_STEP_GPIO, GPIO_MODE_OUTPUT);
     gpio_reset_pin(Y_EN_GPIO); 
     gpio_set_direction(Y_EN_GPIO, GPIO_MODE_OUTPUT);
+}
+
+void pwm_config(){
+    /*
+     * Prepare and set configuration of timers
+     * that will be used by LED Controller
+     */
+    ledc_timer_config_t pwm_timer = {
+        .duty_resolution = LEDC_TIMER_11_BIT, // resolution of PWM duty
+        .freq_hz = PWM_TIMER_FREQ,            // frequency of PWM signal
+        .speed_mode = PWM_LS_MODE,            // timer mode
+        .timer_num = PWM_LS_TIMER,            // timer index
+        .clk_cfg = LEDC_AUTO_CLK,             // Auto select the source clock
+    };
+    // Set configuration of timer0 for high speed channels
+    ledc_timer_config(&pwm_timer);
+    
+    /*
+     * Prepare individual configuration
+     * for each channel of LED Controller
+     * by selecting:
+     * - controller's channel number
+     * - output duty cycle, set initially to 0
+     * - GPIO number where LED is connected to
+     * - speed mode, either high or low
+     * - timer servicing selected channel
+     *   Note: if different channels use one timer,
+     *         then frequency and bit_num of these channels
+     *         will be the same
+     */
+    z_pwm_channel = (ledc_channel_config_t){
+        .channel    = Z_PWM_LS_CH0_CHANNEL,
+        .duty       = 0,
+        .gpio_num   = Z_PWM_LS_CH0_GPIO,
+        .speed_mode = PWM_LS_MODE,
+        .hpoint     = 0,
+        .timer_sel  = PWM_LS_TIMER
+    };
+/*
+    y_pwm_channel = (ledc_channel_config_t){
+        .channel    = Y_PWM_LS_CH1_CHANNEL,
+        .duty       = 0,
+        .gpio_num   = Y_PWM_LS_CH1_GPIO,
+        .speed_mode = PWM_LS_MODE,
+        .hpoint     = 0,
+        .timer_sel  = PWM_LS_TIMER
+    };
+*/
+    // Set LED Controller with previously prepared configuration
+    ledc_channel_config(&z_pwm_channel);
+  //  ledc_channel_config(&y_pwm_channel);
+
+    // Initialize fade service.
+  //   ledc_fade_func_install(0);
 }
 
 void enable_z_stepper_driver(){
@@ -103,7 +175,17 @@ void tick_z_stepper(int dist, int speed_ms){
     //Set z stepper direction
     if(dist < 0) gpio_set_level(Z_DIR_GPIO, 1);
     else gpio_set_level(Z_DIR_GPIO, 0);
- 
+
+
+    //fade up
+    /*
+    ledc_set_fade_with_time(ledc_channel[ch].speed_mode, ledc_channel[ch].channel, LEDC_TEST_DUTY, LEDC_TEST_FADE_TIME);
+    ledc_fade_start(ledc_channel[ch].speed_mode, ledc_channel[ch].channel, LEDC_FADE_NO_WAIT);
+    */
+    
+    ledc_set_duty(z_pwm_channel.speed_mode, z_pwm_channel.channel, PWM_TEST_DUTY);
+    ledc_update_duty(z_pwm_channel.speed_mode, z_pwm_channel.channel);
+/*
     for(int i = 0; i < abs(dist); i++){
         gpio_set_level(Z_STEP_GPIO, 1);
         vTaskDelay(speed_ms / portTICK_PERIOD_MS);
@@ -112,6 +194,8 @@ void tick_z_stepper(int dist, int speed_ms){
     }
 
     disable_z_stepper_driver();
+}
+*/
 }
 
 void tick_y_stepper(int dist, int speed_ms){
@@ -139,7 +223,6 @@ static esp_err_t get_handler(httpd_req_t *req)
     char* buf;
     size_t buf_len;
 
-    bool device_selected = false;
     bool read_device = false;
     char device[32] = "not_selected";
     char device_value_str[32] = "-2";
@@ -168,11 +251,7 @@ static esp_err_t get_handler(httpd_req_t *req)
         free(buf);
     }
 
-
-    device_selected = true;
-
     if(strcmp(device, "not_selected") == 0){
-        device_selected = false;
         ESP_LOGI(TAG, "NO DEVICE SELECTED");
     } else if(strcmp(device, "lights") == 0){ 
         ESP_LOGI(TAG, "Lights command found...");
@@ -237,8 +316,7 @@ static esp_err_t get_handler(httpd_req_t *req)
             ESP_LOGI(TAG, "INVALID Y STEPPER INPUT, CHOOSE VALUE BETWEEN %d and %d", y_lower_bound, y_upper_bound); 
         } 
     } else{
-            device_selected = false;
-            ESP_LOGI(TAG, "INVALID DEVICE INPUT");
+        ESP_LOGI(TAG, "INVALID DEVICE INPUT");
     }
     
     if (read_device){
@@ -442,11 +520,15 @@ static void connect_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
+
+
+
 void app_main(void)
 {
     static httpd_handle_t server = NULL;
 
     setup_gpio();
+    pwm_config();
 
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());
