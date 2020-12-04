@@ -51,8 +51,14 @@ int temperature_value;
 int humidity_value;
 
 int z_distance;
+const int z_speed = 10;
+const int z_lower_bound = -2000;
+const int z_upper_bound = 2000;
 
-const int steps_per_rev = 200;
+int y_distance;
+const int y_speed = 10;
+const int y_lower_bound = -2000;
+const int y_upper_bound = 2000;
 
 void setup_gpio(){
     gpio_reset_pin(PUMP_GPIO);
@@ -74,30 +80,58 @@ void setup_gpio(){
     gpio_set_direction(Y_EN_GPIO, GPIO_MODE_OUTPUT);
 }
 
-void enable_stepper_drivers(){
-    gpio_set_level(Z_EN_GPIO, 1);
-    gpio_set_level(Y_EN_GPIO, 1);
+void enable_z_stepper_driver(){
+    gpio_set_level(Z_EN_GPIO, 0);
 }
 
-void disable_stepper_drivers(){
-    gpio_set_level(Z_EN_GPIO, 0);
+void disable_z_stepper_driver(){
+    gpio_set_level(Z_EN_GPIO, 1);
+}
+
+void enable_y_stepper_driver(){
     gpio_set_level(Y_EN_GPIO, 0);
 }
 
-void tick_z_stepper(int dir, int dist, int speed_ms){
+void disable_y_stepper_driver(){
+    gpio_set_level(Y_EN_GPIO, 1);
+}
+
+void tick_z_stepper(int dist, int speed_ms){
     //Enable Z stepper driver
-    enable_stepper_drivers();
+    enable_z_stepper_driver();
 
     //Set z stepper direction
-    gpio_set_level(Z_DIR_GPIO, dir);
-
-    for(int i = 0; i < dist; i++){
+    if(dist < 0) gpio_set_level(Z_DIR_GPIO, 1);
+    else gpio_set_level(Z_DIR_GPIO, 0);
+ 
+    for(int i = 0; i < abs(dist); i++){
         gpio_set_level(Z_STEP_GPIO, 1);
         vTaskDelay(speed_ms / portTICK_PERIOD_MS);
         gpio_set_level(Z_STEP_GPIO, 0);
         vTaskDelay(speed_ms / portTICK_PERIOD_MS); 
     }
+
+    disable_z_stepper_driver();
 }
+
+void tick_y_stepper(int dist, int speed_ms){
+    //Enable Y stepper driver
+    enable_y_stepper_driver();
+
+    //Set Y stepper direction
+    if(dist < 0) gpio_set_level(Y_DIR_GPIO, 1);
+    else gpio_set_level(Y_DIR_GPIO, 0);
+ 
+    for(int i = 0; i < abs(dist); i++){
+        gpio_set_level(Y_STEP_GPIO, 1);
+        vTaskDelay(speed_ms / portTICK_PERIOD_MS);
+        gpio_set_level(Y_STEP_GPIO, 0);
+        vTaskDelay(speed_ms / portTICK_PERIOD_MS); 
+    }
+
+    disable_y_stepper_driver();
+}
+
 
 /* An HTTP GET handler */
 static esp_err_t get_handler(httpd_req_t *req)
@@ -184,17 +218,25 @@ static esp_err_t get_handler(httpd_req_t *req)
         }
     } else if(strcmp(device, "z_stepper") == 0){
         ESP_LOGI(TAG, "Z stepper motor command found...");
-        if (device_value == -1){
-            device_value = z_distance;
-            itoa(device_value, device_value_str, DECIMAL);
-        } else if (device_value >= 0 && device_value <= 1000){
+        if (device_value >= z_lower_bound && device_value <= z_upper_bound){
             z_distance = device_value;
-            tick_z_stepper(1, z_distance, 500);    
+            tick_z_stepper(z_distance, z_speed);    
         } else {
-            ESP_LOGI(TAG, "INVALID Z STEPPER INPUT, CHOOSE VALUE BETWEEN -1 and  1000"); 
+            ESP_LOGI(TAG, "INVALID Z STEPPER INPUT, CHOOSE VALUE BETWEEN %d and  %d", z_lower_bound, z_upper_bound); 
         } 
-    }
-    else{
+    } else if(strcmp(device, "y_stepper") == 0){
+        ESP_LOGI(TAG, "Y stepper motor command found...");
+        /*if (device_value == -1){
+            device_value = y_distance;
+            itoa(device_value, device_value_str, DECIMAL);
+        } else*/
+        if (device_value >= y_lower_bound && device_value <= y_upper_bound){
+            y_distance = device_value;
+            tick_y_stepper(y_distance, y_speed);    
+        } else {
+            ESP_LOGI(TAG, "INVALID Y STEPPER INPUT, CHOOSE VALUE BETWEEN %d and %d", y_lower_bound, y_upper_bound); 
+        } 
+    } else{
             device_selected = false;
             ESP_LOGI(TAG, "INVALID DEVICE INPUT");
     }
