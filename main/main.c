@@ -25,6 +25,7 @@
 #include "esp_err.h"
 
 #include "fan_pwm.h"
+#include "stepper.h"
 
 /* MiGroBox ESP32s2 code - ECE Capstone Fall 2020 
   
@@ -34,64 +35,46 @@
 */
 #define DECIMAL       10
 
-#define PUMP_GPIO CONFIG_PUMP_RELAY_GPIO
-#define LIGHT_GPIO CONFIG_LIGHT_RELAY_GPIO
+#define PUMP_GPIO               CONFIG_PUMP_RELAY_GPIO
+#define LIGHT_GPIO              CONFIG_LIGHT_RELAY_GPIO
 
-#define Z_DIR_GPIO   10
-#define Z_STEP_GPIO  11
-#define Z_EN_GPIO    12
+#define Z_DIR_GPIO              (10)
+#define Z_EN_GPIO               (12)
 
-#define Y_DIR_GPIO   13
-#define Y_STEP_GPIO  14
-#define Y_EN_GPIO    15
+#define Y_DIR_GPIO              (13)
+#define Y_EN_GPIO               (15)
 
-#define PWM_LS_TIMER            LEDC_TIMER_0
-#define PWM_LS_MODE             LEDC_LOW_SPEED_MODE
-
-#define Z_PWM_LS_CH0_GPIO       (11)
-#define Z_PWM_LS_CH0_CHANNEL    LEDC_CHANNEL_0
-#define Y_PWM_LS_CH1_GPIO       (14)
-#define Y_PWM_LS_CH1_CHANNEL    LEDC_CHANNEL_1
-
-#define PWM_CH_NUM             (1)
-#define PWM_TIMER_FREQ         (500)
-#define PWM_TEST_DUTY          (1024)
-#define PWM_TEST_FADE_TIME     (250)
+#define STEPPER_PWM_LS_TIMER    LEDC_TIMER_0
+#define Z_PWM_LS_GPIO           (11)
+#define Z_PWM_LS_CHANNEL        LEDC_CHANNEL_0
+#define Y_PWM_LS_GPIO           (14)
+#define Y_PWM_LS_CHANNEL        LEDC_CHANNEL_1
 
 #define Z_ENDSTOP_GPIO         20
 #define Y_ENDSTOP_GPIO         21
-#define ENDSTOP_GPIO_PIN_SEL   ((1ULL<<Z_ENDSTOP_GPIO) | (1ULL<<Y_ENDSTOP_GPIO))
 
 #define ESP_INTR_FLAG_DEFAULT  0
 
-#define FAN_PWM_LS_TIMER            LEDC_TIMER_0
-#define FAN_PWM_LS_MODE             LEDC_LOW_SPEED_MODE
+#define FAN_PWM_LS_TIMER            LEDC_TIMER_1
 
 #define FAN_1_PWM_LS_GPIO           (16)
 #define FAN_1_PWM_LS_CHANNEL        LEDC_CHANNEL_2
+#define FAN_2_PWM_LS_GPIO           (17)
+#define FAN_2_PWM_LS_CHANNEL        LEDC_CHANNEL_3
 
 static const char *TAG = "MiGroBox Main";
 
-//typedef struct fan_pwm_t fan_pwm_t;
 
 fan_pwm_t fan_1;
+fan_pwm_t fan_2;
+
+stepper_t z_stepper;
+stepper_t y_stepper;
 
 int lights_value;
 int pump_value;
-int fan_1_value;
-int fan_2_value;
 int temperature_value;
 int humidity_value;
-
-int z_distance;
-const int z_speed = 10;
-const int z_lower_bound = -2000;
-const int z_upper_bound = 2000;
-
-int y_distance;
-const int y_speed = 10;
-const int y_lower_bound = -2000;
-const int y_upper_bound = 2000;
 
 ledc_channel_config_t z_pwm_channel;
 ledc_channel_config_t y_pwm_channel;
@@ -136,7 +119,8 @@ void setup_gpio(){
     gpio_set_direction(PUMP_GPIO, GPIO_MODE_OUTPUT);
     gpio_reset_pin(LIGHT_GPIO); 
     gpio_set_direction(LIGHT_GPIO, GPIO_MODE_OUTPUT);
-    
+
+   /* 
     //CNC Stepper Motors
     gpio_reset_pin(Z_DIR_GPIO);
     gpio_set_direction(Z_DIR_GPIO, GPIO_MODE_OUTPUT);
@@ -199,7 +183,7 @@ void setup_gpio(){
 //    gpio_isr_handler_add(Z_ENDSTOP_GPIO, endstop_isr_handler, (void*) z_endstop_xHandle);
     //hook isr handler for specific gpio pin
  //   gpio_isr_handler_add(Y_ENDSTOP_GPIO, gpio_isr_handler, (void*) Y_ENDSTOP_GPIO);
-
+*/
 
 
 /*
@@ -212,11 +196,13 @@ void setup_gpio(){
 
 }
 
+
+/*
 void pwm_config(){
-    /*
+    *
      * Prepare and set configuration of timers
      * that will be used by LED Controller
-     */
+     *
     ledc_timer_config_t pwm_timer = {
         .duty_resolution = LEDC_TIMER_11_BIT, // resolution of PWM duty
         .freq_hz = PWM_TIMER_FREQ,            // frequency of PWM signal
@@ -227,7 +213,7 @@ void pwm_config(){
     // Set configuration of timer0 for high speed channels
     ledc_timer_config(&pwm_timer);
     
-    /*
+    *
      * Prepare individual configuration
      * for each channel of LED Controller
      * by selecting:
@@ -239,7 +225,7 @@ void pwm_config(){
      *   Note: if different channels use one timer,
      *         then frequency and bit_num of these channels
      *         will be the same
-     */
+     *
 
     //ledc_channel_config_t 
     z_pwm_channel = (ledc_channel_config_t){
@@ -267,8 +253,8 @@ void pwm_config(){
 
     // Initialize fade service.
      ledc_fade_func_install(0);
-}
-
+}*/
+/*
 void enable_z_stepper_driver(){
     gpio_set_level(Z_EN_GPIO, 0);
 }
@@ -294,10 +280,10 @@ void tick_z_stepper(int dist, int freq){
     else gpio_set_level(Z_DIR_GPIO, 0);
 
     //fade up
-    /*
-    ledc_set_fade_with_time(ledc_channel[ch].speed_mode, ledc_channel[ch].channel, LEDC_TEST_DUTY, LEDC_TEST_FADE_TIME);
-    ledc_fade_start(ledc_channel[ch].speed_mode, ledc_channel[ch].channel, LEDC_FADE_NO_WAIT);
-    */
+    
+    //ledc_set_fade_with_time(ledc_channel[ch].speed_mode, ledc_channel[ch].channel, LEDC_TEST_DUTY, LEDC_TEST_FADE_TIME);
+    //ledc_fade_start(ledc_channel[ch].speed_mode, ledc_channel[ch].channel, LEDC_FADE_NO_WAIT);
+    
 
     //ledc_set_duty(z_pwm_channel.speed_mode, z_pwm_channel.channel, PWM_TEST_DUTY);
     //ledc_update_duty(z_pwm_channel.speed_mode, z_pwm_channel.channel);
@@ -319,6 +305,7 @@ void tick_y_stepper(int dist, int freq){
     ledc_set_freq(y_pwm_channel.speed_mode, y_pwm_channel.timer_sel, freq);
    // ledc_set_duty_and_update(y_pwm_channel.speed_mode, y_pwm_channel.channel, PWM_TEST_DUTY, y_pwm_channel.hpoint);
 }
+*/
 
 /* An HTTP GET handler */
 static esp_err_t get_handler(httpd_req_t *req)
@@ -387,39 +374,53 @@ static esp_err_t get_handler(httpd_req_t *req)
             set_fan_duty(&fan_1, (uint32_t)device_value);
             if (device_value == 0) ledc_stop((fan_1.fan_pwm_channel).speed_mode, (fan_1.fan_pwm_channel).channel, 0);
         } else {
-            ESP_LOGI(TAG, "INVALID FAN_1 INPUT, CHOOSE VALUE BETWEEN -1 and %d", fan_1.max_duty); 
+            ESP_LOGW(TAG, "INVALID FAN_1 INPUT, CHOOSE VALUE BETWEEN -1 and %d", fan_1.max_duty); 
         }
     } else if(strcmp(device, "fan_2") == 0){ 
         ESP_LOGI(TAG, "Fan_2 command found...");
         if (device_value == -1) {
-            device_value = fan_2_value;
+            device_value = fan_2.duty;
             itoa(device_value, device_value_str, DECIMAL);
-        } else if (device_value >= 0 && device_value <= 255){
-            fan_2_value = device_value;
+        } else if (device_value >= 0 && device_value <= fan_2.max_duty){
+            set_fan_duty(&fan_2, (uint32_t)device_value);
+            if (device_value == 0) ledc_stop((fan_2.fan_pwm_channel).speed_mode, (fan_2.fan_pwm_channel).channel, 0);
         } else {
-            ESP_LOGI(TAG, "INVALID FAN_2 INPUT, CHOOSE VALUE BETWEEN -1 and 255"); 
+            ESP_LOGW(TAG, "INVALID FAN_2 INPUT, CHOOSE VALUE BETWEEN -1 and %d", fan_2.max_duty); 
         }
     } else if(strcmp(device, "z_stepper") == 0){
         ESP_LOGI(TAG, "Z stepper motor command found...");
-        if (device_value >= z_lower_bound && device_value <= z_upper_bound){
-            z_distance = device_value;
-            tick_z_stepper(z_distance, z_speed);    
+        if (device_value >= z_stepper.min_position && device_value <= z_stepper.max_position){
+            z_stepper.travel_distance_command = device_value;
+            tick_stepper(&z_stepper, z_stepper.travel_distance_command);    
         } else {
-            ESP_LOGI(TAG, "INVALID Z STEPPER INPUT, CHOOSE VALUE BETWEEN %d and  %d", z_lower_bound, z_upper_bound); 
+            ESP_LOGI(TAG, "INVALID Z STEPPER INPUT, CHOOSE VALUE BETWEEN %d and  %d", z_stepper.min_position, z_stepper.max_position); 
         } 
     } else if(strcmp(device, "y_stepper") == 0){
         ESP_LOGI(TAG, "Y stepper motor command found...");
-        /*if (device_value == -1){
-            device_value = y_distance;
-            itoa(device_value, device_value_str, DECIMAL);
-        } else*/
+        if (device_value >= y_stepper.min_position && device_value <= y_stepper.max_position){
+            y_stepper.travel_distance_command = device_value;
+            tick_stepper(&y_stepper, y_stepper.travel_distance_command);    
+        } else {
+            ESP_LOGI(TAG, "INVALID Y STEPPER INPUT, CHOOSE VALUE BETWEEN %d and  %d", y_stepper.min_position, y_stepper.max_position); 
+        } 
+    } 
+
+    /*
+    else if(strcmp(device, "y_stepper") == 0){
+        ESP_LOGI(TAG, "Y stepper motor command found...");
+      //  if (device_value == -1){
+       //     device_value = y_distance;
+        //    itoa(device_value, device_value_str, DECIMAL);
+       // } else
+
         if (device_value >= y_lower_bound && device_value <= y_upper_bound){
             y_distance = device_value;
             tick_y_stepper(y_distance, y_speed);    
         } else {
             ESP_LOGI(TAG, "INVALID Y STEPPER INPUT, CHOOSE VALUE BETWEEN %d and %d", y_lower_bound, y_upper_bound); 
         } 
-    } else{
+    } */
+    else{
         ESP_LOGI(TAG, "INVALID DEVICE INPUT");
     }
     
@@ -632,9 +633,13 @@ void app_main(void)
     static httpd_handle_t server = NULL;
 
     setup_gpio();
-    pwm_config();
+    //pwm_config();
 
-    fan_config(&fan_1, FAN_1_PWM_LS_GPIO, FAN_PWM_DEFAULT_FREQUENCY, FAN_PWM_LS_TIMER, FAN_1_PWM_LS_CHANNEL);
+    config_stepper(&z_stepper, "Z Stepper", STEPPER_PWM_LS_TIMER, Z_PWM_LS_CHANNEL, Z_DIR_GPIO, Z_PWM_LS_GPIO, Z_EN_GPIO, 2000, 0);
+    config_stepper(&y_stepper, "Y Stepper", STEPPER_PWM_LS_TIMER, Y_PWM_LS_CHANNEL, Y_DIR_GPIO, Y_PWM_LS_GPIO, Y_EN_GPIO, 4000, 0);
+
+    fan_config(&fan_1, "Fan_1", FAN_1_PWM_LS_GPIO, FAN_PWM_DEFAULT_FREQUENCY, FAN_PWM_LS_TIMER, FAN_1_PWM_LS_CHANNEL);
+    fan_config(&fan_2, "Fan_2", FAN_2_PWM_LS_GPIO, FAN_PWM_DEFAULT_FREQUENCY, FAN_PWM_LS_TIMER, FAN_2_PWM_LS_CHANNEL);
 
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());

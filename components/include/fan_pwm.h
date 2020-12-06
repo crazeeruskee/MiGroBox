@@ -8,6 +8,9 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "esp_err.h"
 #include "driver/ledc.h"
 
@@ -24,6 +27,7 @@ typedef struct{
     ledc_timer_bit_t      duty_res;
     ledc_timer_config_t   fan_pwm_timer;
     ledc_channel_config_t fan_pwm_channel;
+    char*                 TAG;
 } fan_pwm_t;
 
 
@@ -39,11 +43,9 @@ typedef struct{
     .fan_pwm_channel = NULL   \
 }
 
-esp_err_t fan_config(fan_pwm_t *fan, int gpio, uint32_t freq, ledc_timer_t timer_sel, ledc_channel_t channel_sel);
-
+esp_err_t fan_config(fan_pwm_t *fan, char *TAG, int gpio, uint32_t freq, ledc_timer_t timer_sel, ledc_channel_t channel_sel);
 
 void set_fan_speed(fan_pwm_t *fan, uint32_t freq);
-
 
 uint32_t get_fan_speed(fan_pwm_t *fan);
 

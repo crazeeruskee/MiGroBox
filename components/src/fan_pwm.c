@@ -5,7 +5,6 @@
  *
  */
 
-#include <stdlib.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
@@ -17,11 +16,7 @@
 #include "fan_pwm.h"
 #include "esp_rom_sys.h"
 
-static const char *TAG = "Fan PWM";
-
-//typedef struct fan_pwm_t fan_pwm_t;
-
-esp_err_t fan_config(fan_pwm_t *fan, int gpio, uint32_t freq, ledc_timer_t timer_sel, ledc_channel_t channel_sel){
+esp_err_t fan_config(fan_pwm_t *fan, char *TAG, int gpio, uint32_t freq, ledc_timer_t timer_sel, ledc_channel_t channel_sel){
     fan->freq = freq;
     fan->max_speed = FAN_MAX_FREQUENCY;
     fan->duty = 1024;
@@ -29,7 +24,7 @@ esp_err_t fan_config(fan_pwm_t *fan, int gpio, uint32_t freq, ledc_timer_t timer
     fan->fan_pwm_timer = (ledc_timer_config_t){
         .duty_resolution = FAN_DUTY_RES,  // resolution of PWM duty
         .freq_hz = freq,                  // frequency of PWM signal
-        .speed_mode = FAN_PWM_LS_MODE,        // timer mode
+        .speed_mode = FAN_PWM_LS_MODE,    // timer mode
         .timer_num = timer_sel,           // timer index
         .clk_cfg = LEDC_AUTO_CLK,         // Auto select the source clock
     };
@@ -44,7 +39,11 @@ esp_err_t fan_config(fan_pwm_t *fan, int gpio, uint32_t freq, ledc_timer_t timer
         .timer_sel  = timer_sel,
     };
 
-     ledc_channel_config(&(fan->fan_pwm_channel));
+    ledc_channel_config(&(fan->fan_pwm_channel));
+
+
+    fan->TAG = "FAN";
+//    strcpy(fan->TAG, TAG);
 
      return ESP_OK;
 }
@@ -53,7 +52,7 @@ void set_fan_speed(fan_pwm_t *fan, uint32_t freq){
     fan->freq = freq;
     ledc_set_duty_and_update((fan->fan_pwm_channel).speed_mode, (fan->fan_pwm_channel).channel, fan->duty, (fan->fan_pwm_channel).hpoint);
     ledc_set_freq((fan->fan_pwm_channel).speed_mode, (fan->fan_pwm_channel).timer_sel, freq);
-    ESP_LOGI(TAG, "FAN FREQUENCY SET TO %d", fan->freq);
+    ESP_LOGI(fan->TAG, "FAN FREQUENCY SET TO %d", fan->freq);
 }
 
 uint32_t get_fan_speed(fan_pwm_t *fan){
@@ -64,9 +63,9 @@ void set_fan_duty(fan_pwm_t *fan, uint32_t duty){
     if(duty <= fan->max_duty){
         fan->duty = duty;
         ledc_set_duty_and_update((fan->fan_pwm_channel).speed_mode, (fan->fan_pwm_channel).channel, fan->duty, (fan->fan_pwm_channel).hpoint);
-        ESP_LOGI(TAG, "FAN FREQUENCY SET TO %d", fan->freq);
+        ESP_LOGI(fan->TAG, "FAN FREQUENCY SET TO %d", fan->freq);
     } else{
-        ESP_LOGI(TAG, "ERROR: FAN DUTY INPUT OVER MAX DUTY OF %d", fan->max_duty);
+        ESP_LOGW(fan->TAG, "ERROR: FAN DUTY INPUT OVER MAX DUTY OF %d", fan->max_duty);
     }
 }
 
