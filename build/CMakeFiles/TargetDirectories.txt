@@ -1,11 +1,9 @@
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/install/strip.dir
-/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/install/local.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/install.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/edit_cache.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/dfu-flash.dir
-/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/size-components.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/dfu-list.dir
-/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/simple.elf.dir
+/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/size-components.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/dfu.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/encrypted-flash.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/rebuild_cache.dir
@@ -16,6 +14,8 @@
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/flash.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/monitor.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/gen_project_binary.dir
+/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/install/local.dir
+/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/migrobox.elf.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/_project_elf_src.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/bootloader.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/CMakeFiles/confserver.dir
@@ -634,6 +634,13 @@
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/protocol_examples_common/CMakeFiles/list_install_components.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/protocol_examples_common/CMakeFiles/install/local.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/protocol_examples_common/CMakeFiles/__idf_protocol_examples_common.dir
+/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/components/CMakeFiles/install/local.dir
+/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/components/CMakeFiles/install/strip.dir
+/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/components/CMakeFiles/install.dir
+/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/components/CMakeFiles/list_install_components.dir
+/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/components/CMakeFiles/rebuild_cache.dir
+/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/components/CMakeFiles/edit_cache.dir
+/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/components/CMakeFiles/__idf_components.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/main/CMakeFiles/install/local.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/main/CMakeFiles/__idf_main.dir
 /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/main/CMakeFiles/rebuild_cache.dir

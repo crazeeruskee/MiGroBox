@@ -1,7 +1,3 @@
-#
-# Automatically generated file. DO NOT EDIT.
-# Espressif IoT Development Framework (ESP-IDF) Project Configuration
-#
 CONFIG_IDF_CMAKE=y
 CONFIG_IDF_TARGET_ARCH_XTENSA=y
 CONFIG_IDF_TARGET="esp32s2"
@@ -142,8 +138,8 @@ CONFIG_EXAMPLE_CONNECT_IPV6_PREF_LOCAL_LINK=y
 #
 # MiGroBox GPIO RELAY Configuration
 #
-CONFIG_LIGHT_RELAY_GPIO=18
-CONFIG_PUMP_RELAY_GPIO=19
+CONFIG_LIGHT_RELAY_GPIO=5
+CONFIG_PUMP_RELAY_GPIO=5
 # end of MiGroBox GPIO RELAY Configuration
 
 #

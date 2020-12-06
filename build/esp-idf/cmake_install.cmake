@@ -112,6 +112,7 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   include("/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/ulp/cmake_install.cmake")
   include("/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/wifi_provisioning/cmake_install.cmake")
   include("/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/protocol_examples_common/cmake_install.cmake")
+  include("/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/components/cmake_install.cmake")
   include("/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/main/cmake_install.cmake")
 
 endif()
