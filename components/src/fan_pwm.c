@@ -16,7 +16,15 @@
 #include "fan_pwm.h"
 #include "esp_rom_sys.h"
 
-esp_err_t fan_config(fan_pwm_t *fan, char *TAG, int gpio, uint32_t freq, ledc_timer_t timer_sel, ledc_channel_t channel_sel){
+fan_pwm_t* init_fan(){
+    fan_pwm_t* fan_p = malloc(sizeof(fan_pwm_t));
+    if(fan_p == NULL){
+        printf("FAN INIT: MALLOC FAILED!");
+    }
+    return fan_p;
+}
+
+esp_err_t config_fan(fan_pwm_t *fan, char *TAG, int gpio, uint32_t freq, ledc_timer_t timer_sel, ledc_channel_t channel_sel){
     fan->freq = freq;
     fan->max_speed = FAN_MAX_FREQUENCY;
     fan->duty = 1024;
@@ -41,11 +49,10 @@ esp_err_t fan_config(fan_pwm_t *fan, char *TAG, int gpio, uint32_t freq, ledc_ti
 
     ledc_channel_config(&(fan->fan_pwm_channel));
 
-
-    fan->TAG = "FAN";
-//    strcpy(fan->TAG, TAG);
-
-     return ESP_OK;
+    strncpy(fan->TAG, TAG, TAG_SIZE-1);
+    fan->TAG[TAG_SIZE-1] = '\0';
+    
+    return ESP_OK;
 }
 
 void set_fan_speed(fan_pwm_t *fan, uint32_t freq){

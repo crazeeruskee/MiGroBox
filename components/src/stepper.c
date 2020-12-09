@@ -10,11 +10,15 @@
 #include "freertos/queue.h"
 #include "freertos/timers.h"
 #include "esp_compiler.h"
+#include "esp_attr.h"
 #include "esp_log.h"
 #include "driver/dedic_gpio.h"
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 #include "stepper.h"
+#include "esp_rom_sys.h"
+
+#include <string.h>
 #include "esp_rom_sys.h"
 
 /* MiGroBox ESP32s2 stepper motor driver code - ECE Capstone Fall 2020 
@@ -37,8 +41,29 @@ static void IRAM_ATTR y_endstop_isr_handler(void* arg){
 }
 
 */
+/*
+static void IRAM_ATTR step_counter_intr_handler(void *arg)
+{
+    int pcnt_unit = (int)arg;
+    pcnt_evt_t evt;
+    evt.unit = pcnt_unit;
+    / Save the PCNT event type that caused an interrupt
+       to pass it to the main program /
+    pcnt_get_event_status(pcnt_unit, &evt.status);
+    xQueueSendFromISR(pcnt_evt_queue, &evt, NULL);
+}
+*/
+
+stepper_t* init_stepper(){
+    stepper_t* stepper_p = malloc(sizeof(stepper_t));
+    if(stepper_p == NULL){
+        printf("STEPPER INIT: MALLOC FAILED!");
+    }   
+    return stepper_p;
+}
 
 esp_err_t config_stepper(stepper_t *stepper, char *TAG, ledc_timer_t timer_sel, ledc_channel_t channel_sel, uint32_t dir_gpio, uint32_t step_gpio, uint32_t en_gpio, int max_position, int min_position){
+        
     stepper->dir_gpio = dir_gpio;
     stepper->step_gpio = step_gpio;
     stepper->en_gpio = en_gpio;
@@ -76,8 +101,8 @@ esp_err_t config_stepper(stepper_t *stepper, char *TAG, ledc_timer_t timer_sel, 
     };
     ledc_channel_config(&(stepper->stepper_pwm_channel));
 
-    stepper->TAG = "Stepper";
-   // strcpy(stepper->TAG, TAG);
+    strncpy(stepper->TAG, TAG, TAG_SIZE-1);
+    stepper->TAG[TAG_SIZE-1] = '\0';
 
     // Initialize fade service.
      ledc_fade_func_install(0);

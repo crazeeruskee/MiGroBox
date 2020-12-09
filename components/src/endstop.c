@@ -17,34 +17,56 @@
 #include "endstop.h"
 #include "esp_rom_sys.h"
 
+#include <string.h>
+#include "esp_rom_sys.h"
+
 /* MiGroBox endstop code - ECE Capstone Fall 2020 
 */
 
 ///*static*/ xQueueHandle endstop_evt_queue = NULL;
-
-void IRAM_ATTR endstop_isr_handler(void* arg){
+/*
+static void IRAM_ATTR endstop_isr_handler(void* arg){
     endstop_t *endstop = arg;
     //xTaskResumeFromISR(*endstop_xHandle);
-    xQueueSendFromISR(endstop_evt_queue, endstop, NULL);
+    xQueueSendFromISR(*(endstop->evt_queue), endstop, NULL);
 }
 
-void endstop_task(void* arg){
+static void endstop_task(void* arg){
     endstop_t *endstop = arg;
     //Loop forever, same as while(1)
     for(;;){
-        if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
+        if(xQueueReceive(*(endstop->evt_queue), endstop, portMAX_DELAY)) {
         //  vTaskSuspend(NULL);
-            ledc_stop((endstop->stepper).stepper_pwm_channel.speed_mode, (endstop->stepper).stepper_pwm_channel.channel, 0);
+            endstop->pressed_status = 1;
+            ledc_stop(((endstop->stepper)->stepper_pwm_channel).speed_mode, ((endstop->stepper)->stepper_pwm_channel).channel, 0);
             ESP_LOGW(endstop->TAG, "ENDSTOP HIT, MOTOR STOPPED!");
         }
     }
 }
-esp_err_t config_endstop(endstop_t *endstop, stepper_t *stepper, uint32_t gpio, char min_max_axis){
+*/
+
+
+endstop_t* init_endstop(){
+    endstop_t* endstop_p = malloc(sizeof(endstop_t));
+    if(endstop_p == NULL){
+        printf("ENDSTOP INIT: MALLOC FAILED!");
+    }   
+    return endstop_p;
+}
+
+
+esp_err_t config_endstop(char *TAG, endstop_t* endstop, stepper_t *stepper, uint32_t gpio, short min_max_axis, xQueueHandle *evt_queue/*, TaskFunction_t *endstop_isr_handler*/){
+   
+    ESP_LOGW(TAG, "ENTERING ENDSTOP CONFIG");
+
+    endstop->evt_queue = evt_queue;
+    
     endstop->gpio = gpio;
     gpio_config_t endstop_gpio_conf;
     endstop_gpio_conf.intr_type = GPIO_INTR_NEGEDGE;       //interrupt of falling edge
     endstop_gpio_conf.pin_bit_mask = (1ULL<<gpio);         //bit mask of the pins
     endstop_gpio_conf.mode = GPIO_MODE_INPUT;              //set as input mode
+    endstop_gpio_conf.pull_up_en = 0;
     endstop_gpio_conf.pull_down_en = 1;                    //enable pull-down mode
     gpio_config(&endstop_gpio_conf);
 
@@ -52,11 +74,21 @@ esp_err_t config_endstop(endstop_t *endstop, stepper_t *stepper, uint32_t gpio, 
     endstop->min_max_axis = min_max_axis;
     endstop->stepper = stepper;
 
-    endstop->endstop_taskHandle = xTaskCreate(endstop_task, "endstop_task", 2048, (void *) endstop, 5, NULL);  //create endstop task
-    gpio_install_isr_service(ENDSTOP_INTR_FLAG);                                                                  //install gpio isr service
-    gpio_isr_handler_add(gpio, endstop_isr_handler, (void*) endstop);                                             //hook isr handler for specific gpio pin
+    //char *task_handle
+/*
+    endstop->endstop_taskHandle = (TaskHandle_t) xTaskCreate(endstop_task, "endstop_task", 2048, (void *) endstop, 5, NULL);  //create endstop task
+    //gpio_install_isr_service(ENDSTOP_INTR_FLAG);                                                                  //install gpio isr service
+    gpio_isr_handler_add(gpio, endstop_isr_handler, endstop);                                             //hook isr handler for specific gpio pin
+*/
 
-    return ESP_OK;
+    strncpy(endstop->TAG, TAG, TAG_SIZE-1);
+    endstop->TAG[TAG_SIZE-1] = '\0';
+
+    ESP_LOGW(TAG, "EXITING ENDSTOP CONFIG");
+
+    //return ESP_OK;
+    
+    return endstop;
 }
 
 char get_endstop_status(endstop_t *endstop){
@@ -103,7 +135,7 @@ esp_err_t touch_pad_isr_register(intr_handler_t fn, void *arg, touch_pad_intr_ma
         en_msk |= RTC_CNTL_TOUCH_TIMEOUT_INT_ST_M;
     }
     esp_err_t ret = rtc_isr_register(fn, arg, en_msk);
-    /* Must ensure: After being registered, it is executed first. */
+//    / Must ensure: After being registered, it is executed first. /
     if ( (ret == ESP_OK) && (reg_flag == false) && (intr_mask & (TOUCH_PAD_INTR_MASK_SCAN_DONE | TOUCH_PAD_INTR_MASK_TIMEOUT)) ) {
         rtc_isr_register(touch_pad_workaround_isr_internal, NULL, RTC_CNTL_TOUCH_SCAN_DONE_INT_ST_M | RTC_CNTL_TOUCH_TIMEOUT_INT_ST_M);
         reg_flag = true;

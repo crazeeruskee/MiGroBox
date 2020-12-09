@@ -19,6 +19,8 @@
 #define FAN_PWM_DEFAULT_FREQUENCY (250)
 #define FAN_MAX_FREQUENCY         (4000)
 
+#define TAG_SIZE                  32
+
 typedef struct{
     uint32_t              freq;
     uint32_t              max_speed;
@@ -27,7 +29,7 @@ typedef struct{
     ledc_timer_bit_t      duty_res;
     ledc_timer_config_t   fan_pwm_timer;
     ledc_channel_config_t fan_pwm_channel;
-    char*                 TAG;
+    char                  TAG[TAG_SIZE];
 } fan_pwm_t;
 
 
@@ -43,11 +45,13 @@ typedef struct{
     .fan_pwm_channel = NULL   \
 }
 
-esp_err_t fan_config(fan_pwm_t *fan, char *TAG, int gpio, uint32_t freq, ledc_timer_t timer_sel, ledc_channel_t channel_sel);
+fan_pwm_t* init_fan(); 
 
-void set_fan_speed(fan_pwm_t *fan, uint32_t freq);
+esp_err_t config_fan(fan_pwm_t *fan, char *TAG, int gpio, uint32_t freq, ledc_timer_t timer_sel, ledc_channel_t channel_sel);
 
-uint32_t get_fan_speed(fan_pwm_t *fan);
+void set_fan_freq(fan_pwm_t *fan, uint32_t freq);
+
+uint32_t get_fan_freq(fan_pwm_t *fan);
 
 void set_fan_duty(fan_pwm_t *fan, uint32_t duty);
 
