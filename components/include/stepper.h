@@ -91,6 +91,8 @@ void enable_stepper_driver(stepper_t *stepper);
 
 void disable_stepper_driver(stepper_t *stepper);
 
+void stop_stepper_driver(stepper_t *stepper);
+
 void tick_stepper(stepper_t *stepper, int travel_distance_command);
 
 

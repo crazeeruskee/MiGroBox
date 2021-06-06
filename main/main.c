@@ -1,7 +1,7 @@
 /* 
  * Author(s):         Lucas Moiseyev
  * Date Created:      11/30/20
- * Date Last Updated: 12/4/20
+ * Date Last Updated: 1/13/21
  *
  */
 #include <esp_wifi.h>
@@ -30,6 +30,7 @@
 #include "fan_pwm.h"
 #include "endstop.h"
 #include "stepper.h"
+#include "real_time.h"
 
 /* MiGroBox ESP32s2 code - ECE Capstone Fall 2020 
   
@@ -37,10 +38,12 @@
     - Controls stepper drivers
     - Controls power relays
 */
-#define DECIMAL       10
+#define DECIMAL                 10
 
-#define PUMP_GPIO               33//CONFIG_PUMP_RELAY_GPIO
-#define LIGHT_GPIO              34//CONFIG_LIGHT_RELAY_GPIO
+#define RELAY_1_GPIO            (21)
+#define RELAY_8_GPIO            (38)
+#define LIGHT_GPIO              RELAY_1_GPIO//CONFIG_LIGHT_RELAY_GPIO
+#define PUMP_GPIO               RELAY_8_GPIO//CONFIG_PUMP_RELAY_GPIO
 
 #define Z_DIR_GPIO              (10)
 #define Z_EN_GPIO               (12)
@@ -54,21 +57,29 @@
 #define Y_PWM_LS_GPIO           (14)
 #define Y_PWM_LS_CHANNEL        LEDC_CHANNEL_1
 
-#define Z_ENDSTOP_MIN_GPIO         18
-#define Z_ENDSTOP_MAX_GPIO         19
-#define Y_ENDSTOP_MIN_GPIO         20
-#define Y_ENDSTOP_MAX_GPIO         21
+#define Z_ENDSTOP_MIN_GPIO      18
+#define Z_ENDSTOP_MAX_GPIO      19
+#define Y_ENDSTOP_MIN_GPIO      20
+#define Y_ENDSTOP_MAX_GPIO      21
 
-#define ESP_INTR_FLAG_DEFAULT  0
+#define ESP_INTR_FLAG_DEFAULT   0
 
-#define FAN_PWM_LS_TIMER            LEDC_TIMER_1
+#define FAN_PWM_LS_TIMER        LEDC_TIMER_1
 
-#define FAN_1_PWM_LS_GPIO           (16)
-#define FAN_1_PWM_LS_CHANNEL        LEDC_CHANNEL_2
-#define FAN_2_PWM_LS_GPIO           (17)
-#define FAN_2_PWM_LS_CHANNEL        LEDC_CHANNEL_3
+#define FAN_1_PWM_LS_GPIO       (16)
+#define FAN_1_PWM_LS_CHANNEL    LEDC_CHANNEL_2
+#define FAN_2_PWM_LS_GPIO       (17)
+#define FAN_2_PWM_LS_CHANNEL    LEDC_CHANNEL_3
+
+
+//#define ENDSTOP_MIN_Z
+//#define ENDSTOP_MAX_Z
+//#define ENDSTOP_MIN_Y
+//#define ENDSTOP_MAX_Y
 
 static const char *TAG = "MiGroBox Main";
+
+time_t* now_p;
 
 fan_pwm_t* fan_1_p = NULL;
 fan_pwm_t* fan_2_p = NULL;
@@ -84,23 +95,19 @@ int humidity_value;
 
 //TaskHandle_t z_endstop_xHandle = NULL;
 //TaskHandle_t y_endstop_xHandle = NULL; 
-
 static xQueueHandle evt_queue = NULL;
 
 static void IRAM_ATTR gpio_isr_handler(void* arg){
-    //uint32_t gpio_num = (uint32_t) arg;
     endstop_t* endstop_p = (endstop_t *) arg;
-    xQueueSendFromISR(/**(endstop->evt_queue)*/evt_queue, (void *) endstop_p, NULL);
+    xQueueSendFromISR(evt_queue, (void *) endstop_p, NULL);
 }
 
 static void endstop_task(void* arg)
 {
-    endstop_t endstop_p;// = init_endstop();
+    endstop_t endstop_p;
     for(;;) {
-        //endstop_t* endstop_p = init_endstop();
         if(xQueueReceive(evt_queue, (void *) &endstop_p, portMAX_DELAY)) {
-           // if(endstop_p != NULL){
-                if (gpio_get_level(endstop_p.gpio) == 0){
+            if (gpio_get_level(endstop_p.gpio) == 0){
                     endstop_p.pressed_status = 1;
                     ESP_LOGW(TAG, "%s HIT!", endstop_p.TAG); 
                     if(endstop_p.min_max_axis == 0){
@@ -118,80 +125,10 @@ static void endstop_task(void* arg)
                 } else{
                     printf("ERROR: NON-ZERO GPIO LEVEL FOR ENDSTOP MIN PIN!");
                 }
-          /*  } else {
-                printf("endstop still null!");
-                exit(1);
-            }*/
         }
-     //   free(endstop_p);
     }
 }
    
-    /*
-    uint32_t io_num;
-    for(;;) {
-        if(xQueueReceive(evt_queue, &io_num, portMAX_DELAY)) {
-            printf("GPIO[%d] intr, val: %d\n", io_num, gpio_get_level(io_num));
-            if(io_num == 18){
-                if (gpio_get_level(io_num) == 0){
-                    z_endstop_min_p->pressed_status = 1;
-                    printf("Z MIN ENDSTOP HIT\n");
-                    (z_endstop_min_p->stepper)->position = (z_endstop_min_p->stepper)->min_position;
-                    ledc_stop(((z_endstop_min_p->stepper)->stepper_pwm_channel).speed_mode, ((z_endstop_min_p->stepper)->stepper_pwm_channel).channel, 0);
-                    travel_distance = -travel_distance;
-                    tick_stepper(z_endstop_min_p->stepper, travel_distance);
-                } else if(gpio_get_level(io_num) == 1){
-                    z_endstop_min_p->pressed_status = 0;
-                } else{
-                    printf("ERROR: NON-ZERO GPIO LEVEL FOR ENDSTOP MIN PIN!");
-                }
-            } else if(io_num == 19){
-                if (gpio_get_level(io_num) == 0){
-                    z_endstop_max_p->pressed_status = 1;
-                    printf("Z MAX ENDSTOP HIT\n");
-                    (z_endstop_max_p->stepper)->position = (z_endstop_max_p->stepper)->max_position;
-                    ledc_stop(((z_endstop_max_p->stepper)->stepper_pwm_channel).speed_mode, ((z_endstop_max_p->stepper)->stepper_pwm_channel).channel, 0);
-                    travel_distance = -travel_distance;
-                    tick_stepper(z_endstop_max_p->stepper, travel_distance);
-                } else if(gpio_get_level(io_num) == 1){
-                    z_endstop_max_p->pressed_status = 0;
-                } else{
-                    printf("ERROR: NON-ZERO GPIO LEVEL FOR ENDSTOP MAX PIN!");
-                }
-            }else if(io_num == 19){
-                if (gpio_get_level(io_num) == 0){
-                    y_endstop_min_p->pressed_status = 1;
-                    printf("Z MIN ENDSTOP HIT\n");
-                    (y_endstop_min_p->stepper)->position = (y_endstop_min_p->stepper)->min_position;
-                    ledc_stop(((y_endstop_min_p->stepper)->stepper_pwm_channel).speed_mode, ((y_endstop_min_p->stepper)->stepper_pwm_channel).channel, 0);
-                    travel_distance = -travel_distance;
-                    tick_stepper(y_endstop_min_p->stepper, travel_distance);
-                } else if(gpio_get_level(io_num) == 1){
-                    y_endstop_min_p->pressed_status = 0;
-                } else{
-                    printf("ERROR: NON-ZERO GPIO LEVEL FOR ENDSTOP MIN PIN!");
-                }
-            } else if(io_num == 20){
-                if (gpio_get_level(io_num) == 0){
-                    y_endstop_max_p->pressed_status = 1;
-                    printf("Z MAX ENDSTOP HIT\n");
-                    (y_endstop_max_p->stepper)->position = (y_endstop_max_p->stepper)->max_position;
-                    ledc_stop(((y_endstop_max_p->stepper)->stepper_pwm_channel).speed_mode, ((y_endstop_max_p->stepper)->stepper_pwm_channel).channel, 0);
-                    travel_distance = -travel_distance;
-                    tick_stepper(y_endstop_max_p->stepper, travel_distance);
-                } else if(gpio_get_level(io_num) == 1){
-                    y_endstop_max_p->pressed_status = 0;
-                } else{
-                    printf("ERROR: NON-ZERO GPIO LEVEL FOR ENDSTOP MAX PIN!");
-                }
-            }
-
-        
-        }
-    }
-}
-*/
-
 void setup_gpio(){   
     //Relay Peripherals
     gpio_reset_pin(PUMP_GPIO);
@@ -306,7 +243,12 @@ static esp_err_t get_handler(httpd_req_t *req)
         ESP_LOGI(TAG, "NO INPUT VALUE IN GET REQUEST!");
     }
 
-    const char* resp_str = device_value_str; //strcat(strcat("DEVICE: ", device), strcat("VALUE: ", device_value_str));//(const char*) req->user_ctx;
+    struct tm* current_time = get_current_time(now_p);
+    char resp_str[32];
+    sprintf(resp_str, "%d", current_time->tm_year);
+    free(current_time);
+
+        //device_value_str; //strcat(strcat("DEVICE: ", device), strcat("VALUE: ", device_value_str));//(const char*) req->user_ctx;
     /* Set some custom headers */
     if(strcmp(device, "not_selected") != 0){
         httpd_resp_set_hdr(req, "DEVICE: ", device);
@@ -503,66 +445,91 @@ static void connect_handler(void* arg, esp_event_base_t event_base,
 
 void app_main(void)
 {
+
     static httpd_handle_t server = NULL;
 
-  //  endstop_t *queue_endstop_size = init_endstop();
     evt_queue = xQueueCreate(20, sizeof(endstop_t));
     if(evt_queue == NULL){
         ESP_LOGE(TAG, "FAILED TO CREATE INTERRUPT QUEUE!");
         exit(1);
     }
-  //  free(queue_endstop_size);
+
+    now_p = real_time_init();
 
     setup_gpio();
-    //pwm_config();
 
     z_stepper_p = init_stepper();
     config_stepper(z_stepper_p, "Z Stepper", STEPPER_PWM_LS_TIMER, Z_PWM_LS_CHANNEL, Z_DIR_GPIO, Z_PWM_LS_GPIO, Z_EN_GPIO, 2000, 0);
     y_stepper_p = init_stepper();
     config_stepper(y_stepper_p, "Y Stepper", STEPPER_PWM_LS_TIMER, Y_PWM_LS_CHANNEL, Y_DIR_GPIO, Y_PWM_LS_GPIO, Y_EN_GPIO, 4000, 0);
 
+    
+    #ifdef ENDSTOP_MIN_Z
     endstop_t* z_endstop_min_p = init_endstop();
     if(z_endstop_min_p == NULL){
         printf("INIT_ENDSTOP RETURNED NULL!");
         exit(1);
     } 
     config_endstop("Z MIN ENDSTOP", z_endstop_min_p, z_stepper_p, Z_ENDSTOP_MIN_GPIO, 0, &evt_queue);
+    #endif
  
+    #ifdef ENDSTOP_MAX_Z
     endstop_t* z_endstop_max_p = init_endstop();
     if(z_endstop_max_p == NULL){
         printf("INIT_ENDSTOP RETURNED NULL!");
         exit(1);
     } 
     config_endstop("Z MAX ENDSTOP", z_endstop_max_p, z_stepper_p, Z_ENDSTOP_MAX_GPIO, 0, &evt_queue);
+    #endif
    
+    #ifdef ENDSTOP_MIN_Y
     endstop_t* y_endstop_min_p = init_endstop();
     if(y_endstop_min_p == NULL){
         printf("INIT_ENDSTOP RETURNED NULL!");
         exit(1);
     } 
     config_endstop("Y MIN ENDSTOP", y_endstop_min_p, y_stepper_p, Y_ENDSTOP_MIN_GPIO, 0, &evt_queue);
+    #endif
    
+    #ifdef ENDSTOP_MAX_Y
     endstop_t* y_endstop_max_p = init_endstop();
     if(y_endstop_max_p == NULL){
         printf("INIT_ENDSTOP RETURNED NULL!");
         exit(1);
     } 
     config_endstop("Y MAX ENDSTOP", y_endstop_max_p, y_stepper_p, Y_ENDSTOP_MAX_GPIO, 0, &evt_queue);
+    #endif
     
     //create endstop task
     TaskHandle_t endstop_taskHandle = (TaskHandle_t) xTaskCreate(endstop_task, "es_task", 4096, NULL, 10, NULL);
     
-    z_endstop_min_p->endstop_taskHandle = endstop_taskHandle;
-    z_endstop_max_p->endstop_taskHandle = endstop_taskHandle;
-    y_endstop_min_p->endstop_taskHandle = endstop_taskHandle;
-    y_endstop_max_p->endstop_taskHandle = endstop_taskHandle;
+    #ifdef ENDSTOP_MIN_Z
+        z_endstop_min_p->endstop_taskHandle = endstop_taskHandle;
+    #endif
+    #ifdef ENDSTOP_MAX_Z
+        z_endstop_max_p->endstop_taskHandle = endstop_taskHandle;
+    #endif
+    #ifdef ENDSTOP_MIN_Y
+        y_endstop_min_p->endstop_taskHandle = endstop_taskHandle;
+    #endif
+    #ifdef ENDSTOP_MAX_Y
+        y_endstop_max_p->endstop_taskHandle = endstop_taskHandle;
+    #endif
 
     gpio_install_isr_service(/*ENDSTOP_INTR_FLAG*/ESP_INTR_FLAG_DEFAULT); //install gpio isr service
 
-    gpio_isr_handler_add(z_endstop_min_p->gpio, gpio_isr_handler, (void *) z_endstop_min_p);
-    gpio_isr_handler_add(z_endstop_max_p->gpio, gpio_isr_handler, (void *) z_endstop_max_p);
-    gpio_isr_handler_add(y_endstop_min_p->gpio, gpio_isr_handler, (void *) y_endstop_min_p);
-    gpio_isr_handler_add(y_endstop_max_p->gpio, gpio_isr_handler, (void *) y_endstop_max_p);
+    #ifdef ENDSTOP_MIN_Z
+        gpio_isr_handler_add(z_endstop_min_p->gpio, gpio_isr_handler, (void *) z_endstop_min_p);
+    #endif
+    #ifdef ENDSTOP_MAX_Z
+        gpio_isr_handler_add(z_endstop_max_p->gpio, gpio_isr_handler, (void *) z_endstop_max_p);
+    #endif
+    #ifdef ENDSTOP_MIN_Y
+        gpio_isr_handler_add(y_endstop_min_p->gpio, gpio_isr_handler, (void *) y_endstop_min_p);
+    #endif
+    #ifdef ENDSTOP_MAX_Y
+        gpio_isr_handler_add(y_endstop_max_p->gpio, gpio_isr_handler, (void *) y_endstop_max_p);
+    #endif
 
     fan_1_p = init_fan();
     fan_2_p = init_fan();

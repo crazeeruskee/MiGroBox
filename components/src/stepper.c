@@ -118,8 +118,18 @@ void disable_stepper_driver(stepper_t *stepper){
     gpio_set_level(stepper->en_gpio, 1);
 }
 
+void stop_stepper_driver(stepper_t *stepper){
+    gpio_set_level(stepper->en_gpio, 1);
+    ledc_stop((stepper->stepper_pwm_channel).speed_mode, (stepper->stepper_pwm_channel).channel, 0);
+}
+
 void tick_stepper(stepper_t *stepper, int travel_distance_command){
     stepper->travel_distance_command = travel_distance_command;
+
+    if(travel_distance_command == 0){
+        stop_stepper_driver(stepper);
+        return;
+    }
 
     //Temporary position edit
     if(stepper->position + travel_distance_command > stepper->max_position || stepper->position + travel_distance_command < stepper->min_position){
@@ -128,7 +138,6 @@ void tick_stepper(stepper_t *stepper, int travel_distance_command){
     }
     
     stepper->position += travel_distance_command;
-    
 
     //Enable stepper driver
     enable_stepper_driver(stepper);
