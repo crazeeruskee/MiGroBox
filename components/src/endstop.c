@@ -1,4 +1,4 @@
-/* 
+/*
  * Author(s):         Lucas Moiseyev
  * Date Created:      12/4/20
  * Date Last Updated: 12/6/20
@@ -20,7 +20,7 @@
 #include <string.h>
 #include "esp_rom_sys.h"
 
-/* MiGroBox endstop code - ECE Capstone Fall 2020 
+/* MiGroBox endstop code - ECE Capstone Fall 2020
 */
 
 ///*static*/ xQueueHandle endstop_evt_queue = NULL;
@@ -50,17 +50,17 @@ endstop_t* init_endstop(){
     endstop_t* endstop_p = malloc(sizeof(endstop_t));
     if(endstop_p == NULL){
         printf("ENDSTOP INIT: MALLOC FAILED!");
-    }   
+    }
     return endstop_p;
 }
 
 
 esp_err_t config_endstop(char *TAG, endstop_t* endstop, stepper_t *stepper, uint32_t gpio, short min_max_axis, xQueueHandle *evt_queue/*, TaskFunction_t *endstop_isr_handler*/){
-   
+
     ESP_LOGW(TAG, "ENTERING ENDSTOP CONFIG");
 
     endstop->evt_queue = evt_queue;
-    
+
     endstop->gpio = gpio;
     gpio_config_t endstop_gpio_conf;
     endstop_gpio_conf.intr_type = GPIO_INTR_NEGEDGE;       //interrupt of falling edge
@@ -86,9 +86,7 @@ esp_err_t config_endstop(char *TAG, endstop_t* endstop, stepper_t *stepper, uint
 
     ESP_LOGW(TAG, "EXITING ENDSTOP CONFIG");
 
-    //return ESP_OK;
-    
-    return endstop;
+    return ESP_OK;
 }
 
 char get_endstop_status(endstop_t *endstop){

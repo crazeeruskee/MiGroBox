@@ -1,4 +1,4 @@
-/* * Data converted from /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/build/esp-idf/mbedtls/x509_crt_bundle
+/* * Data converted from /Users/Lucas/Documents/Documents-Lucas_Moiseyev_MacBook_Pro/Dev/MiGroBox/MiGroBoard_esp32s2/MiGroBox/build/esp-idf/mbedtls/x509_crt_bundle
  */
 .data
 .section .rodata.embedded

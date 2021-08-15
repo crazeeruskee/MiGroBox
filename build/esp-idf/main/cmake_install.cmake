@@ -1,4 +1,4 @@
-# Install script for directory: /Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/migrobox/main
+# Install script for directory: /Users/Lucas/Documents/Documents-Lucas_Moiseyev_MacBook_Pro/Dev/MiGroBox/MiGroBoard_esp32s2/MiGroBox/main
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -30,5 +30,10 @@ endif()
 # Is this installation the result of a crosscompile?
 if(NOT DEFINED CMAKE_CROSSCOMPILING)
   set(CMAKE_CROSSCOMPILING "TRUE")
+endif()
+
+# Set default install directory permissions.
+if(NOT DEFINED CMAKE_OBJDUMP)
+  set(CMAKE_OBJDUMP "/Users/Lucas/.espressif/tools/xtensa-esp32s2-elf/esp-2021r1-8.4.0/xtensa-esp32s2-elf/bin/xtensa-esp32s2-elf-objdump")
 endif()
 

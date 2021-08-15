@@ -1,7 +1,7 @@
-/* 
+/*
  * Author(s):         Lucas Moiseyev
  * Date Created:      11/30/20
- * Date Last Updated: 1/13/21
+ * Date Last Updated: 8/15/21
  *
  */
 #include <esp_wifi.h>
@@ -32,8 +32,10 @@
 #include "stepper.h"
 #include "real_time.h"
 
-/* MiGroBox ESP32s2 code - ECE Capstone Fall 2020 
-  
+#include "esp_sntp.h"
+
+/* MiGroBox ESP32s2 code - ECE Capstone Fall 2020
+
     - Runs web server to handle http GET requests
     - Controls stepper drivers
     - Controls power relays
@@ -94,13 +96,15 @@ int temperature_value;
 int humidity_value;
 
 //TaskHandle_t z_endstop_xHandle = NULL;
-//TaskHandle_t y_endstop_xHandle = NULL; 
+//TaskHandle_t y_endstop_xHandle = NULL;
 static xQueueHandle evt_queue = NULL;
 
+#if defined ENDSTOP_MIN_Z || defined ENDSTOP_MAX_Z || defined ENDSTOP_MIN_Y || defined ENDSTOP_MAX_Y
 static void IRAM_ATTR gpio_isr_handler(void* arg){
     endstop_t* endstop_p = (endstop_t *) arg;
     xQueueSendFromISR(evt_queue, (void *) endstop_p, NULL);
 }
+#endif
 
 static void endstop_task(void* arg)
 {
@@ -109,13 +113,14 @@ static void endstop_task(void* arg)
         if(xQueueReceive(evt_queue, (void *) &endstop_p, portMAX_DELAY)) {
             if (gpio_get_level(endstop_p.gpio) == 0){
                     endstop_p.pressed_status = 1;
-                    ESP_LOGW(TAG, "%s HIT!", endstop_p.TAG); 
+                    ESP_LOGW(TAG, "%s HIT!", endstop_p.TAG);
                     if(endstop_p.min_max_axis == 0){
                         (endstop_p.stepper)->position = (endstop_p.stepper)->min_position;
                     } else if(endstop_p.min_max_axis == 1){
                         (endstop_p.stepper)->position = (endstop_p.stepper)->max_position;
                     } else{
-                        ESP_LOGE(TAG, "%s.min_max_axis set incorrectly! Must be 0 or 1", endstop_p.TAG);
+                        ESP_LOGE(TAG, "%s.min_max_axis set incorrectly! Must be"
+                                "0 or 1", endstop_p.TAG);
                     }
                     ledc_stop(((endstop_p.stepper)->stepper_pwm_channel).speed_mode, ((endstop_p.stepper)->stepper_pwm_channel).channel, 0);
                     travel_distance = -travel_distance;
@@ -128,12 +133,12 @@ static void endstop_task(void* arg)
         }
     }
 }
-   
-void setup_gpio(){   
+
+void setup_gpio(){
     //Relay Peripherals
     gpio_reset_pin(PUMP_GPIO);
     gpio_set_direction(PUMP_GPIO, GPIO_MODE_OUTPUT);
-    gpio_reset_pin(LIGHT_GPIO); 
+    gpio_reset_pin(LIGHT_GPIO);
     gpio_set_direction(LIGHT_GPIO, GPIO_MODE_OUTPUT);
 }
 
@@ -157,12 +162,14 @@ static esp_err_t get_handler(httpd_req_t *req)
             ESP_LOGI(TAG, "Found URL query => %s", buf);
             char param[32];
             /* Get value of expected key from query string */
-            if (httpd_query_key_value(buf, "dev", param, sizeof(param)) == ESP_OK) {
+            if (httpd_query_key_value(buf, "dev", param,
+                        sizeof(param)) == ESP_OK) {
                 ESP_LOGI(TAG, "Found URL query parameter => dev=%s", param);
                 strcpy(device, param);
             }
-            if (httpd_query_key_value(buf, "val", param, sizeof(param)) == ESP_OK) {
-                ESP_LOGI(TAG, "Found URL query parameter => val=%s", param); 
+            if (httpd_query_key_value(buf, "val", param,
+                        sizeof(param)) == ESP_OK) {
+                ESP_LOGI(TAG, "Found URL query parameter => val=%s", param);
                 device_value = atoi(param);
                 if(device_value == -1) read_device = true;
                 strcpy(device_value_str, param);
@@ -173,7 +180,7 @@ static esp_err_t get_handler(httpd_req_t *req)
 
     if(strcmp(device, "not_selected") == 0){
         ESP_LOGI(TAG, "NO DEVICE SELECTED");
-    } else if(strcmp(device, "lights") == 0){ 
+    } else if(strcmp(device, "lights") == 0){
         ESP_LOGI(TAG, "Lights command found...");
         if (device_value == -1) {
             device_value = lights_value;
@@ -193,67 +200,80 @@ static esp_err_t get_handler(httpd_req_t *req)
             pump_value = device_value;
             gpio_set_level(PUMP_GPIO, 0x1 ^ device_value);
         } else {
-            ESP_LOGI(TAG, "INVALID PUMP INPUT, CHOOSE -1, 0, OR 1"); 
+            ESP_LOGI(TAG, "INVALID PUMP INPUT, CHOOSE -1, 0, OR 1");
         }
-    } else if(strcmp(device, "fan_1") == 0){ 
+    } else if(strcmp(device, "fan_1") == 0){
         ESP_LOGI(TAG, "Fan_1 command found...");
         if (device_value == -1) {
             device_value = fan_1_p->duty;
             itoa(device_value, device_value_str, DECIMAL);
         } else if (device_value >= 0 && device_value <= fan_1_p->max_duty){
             set_fan_duty(fan_1_p, (uint32_t)device_value);
-            if (device_value == 0) ledc_stop((fan_1_p->fan_pwm_channel).speed_mode, (fan_1_p->fan_pwm_channel).channel, 0);
+            if (device_value == 0)
+                ledc_stop((fan_1_p->fan_pwm_channel).speed_mode,
+                        (fan_1_p->fan_pwm_channel).channel, 0);
         } else {
-            ESP_LOGW(TAG, "INVALID FAN_1 INPUT, CHOOSE VALUE BETWEEN -1 and %d", fan_1_p->max_duty); 
+            ESP_LOGW(TAG, "INVALID FAN_1 INPUT, CHOOSE VALUE BETWEEN -1 and %d",
+                    fan_1_p->max_duty);
         }
-    } else if(strcmp(device, "fan_2") == 0){ 
+    } else if(strcmp(device, "fan_2") == 0){
         ESP_LOGI(TAG, "Fan_2 command found...");
         if (device_value == -1) {
             device_value = fan_2_p->duty;
             itoa(device_value, device_value_str, DECIMAL);
         } else if (device_value >= 0 && device_value <= fan_2_p->max_duty){
             set_fan_duty(fan_2_p, (uint32_t)device_value);
-            if (device_value == 0) ledc_stop((fan_2_p->fan_pwm_channel).speed_mode, (fan_2_p->fan_pwm_channel).channel, 0);
+            if (device_value == 0)
+                ledc_stop((fan_2_p->fan_pwm_channel).speed_mode,
+                        (fan_2_p->fan_pwm_channel).channel, 0);
         } else {
-            ESP_LOGW(TAG, "INVALID FAN_2 INPUT, CHOOSE VALUE BETWEEN -1 and %d", fan_2_p->max_duty); 
+            ESP_LOGW(TAG, "INVALID FAN_2 INPUT, CHOOSE VALUE BETWEEN -1 and %d",
+                    fan_2_p->max_duty);
         }
     } else if(strcmp(device, "z_stepper") == 0){
         ESP_LOGI(TAG, "Z stepper motor command found...");
-        if ((z_stepper_p->position + device_value) >= z_stepper_p->min_position && (z_stepper_p->position + device_value) <= z_stepper_p->max_position){
+        if ((z_stepper_p->position + device_value) >= z_stepper_p->min_position
+                && (z_stepper_p->position + device_value) <= z_stepper_p->max_position){
             z_stepper_p->travel_distance_command = device_value;
-            tick_stepper(z_stepper_p, z_stepper_p->travel_distance_command);    
+            tick_stepper(z_stepper_p, z_stepper_p->travel_distance_command);
         } else {
-            ESP_LOGI(TAG, "INVALID Z STEPPER INPUT, CHOOSE VALUE BETWEEN %d and  %d", z_stepper_p->min_position, z_stepper_p->max_position); 
-        } 
+            ESP_LOGI(TAG, "INVALID Z STEPPER INPUT, CHOOSE VALUE BETWEEN %d and"
+                    "%d", z_stepper_p->min_position, z_stepper_p->max_position);
+        }
     } else if(strcmp(device, "y_stepper") == 0){
         ESP_LOGI(TAG, "Y stepper motor command found...");
-        if ((y_stepper_p->position + device_value) >= y_stepper_p->min_position && (y_stepper_p->position + device_value) <= y_stepper_p->max_position){
+        if ((y_stepper_p->position + device_value) >= y_stepper_p->min_position
+                && (y_stepper_p->position + device_value) <= y_stepper_p->max_position){
             y_stepper_p->travel_distance_command = device_value;
-            tick_stepper(y_stepper_p, y_stepper_p->travel_distance_command);    
+            tick_stepper(y_stepper_p, y_stepper_p->travel_distance_command);
         } else {
-            ESP_LOGI(TAG, "INVALID Y STEPPER INPUT, CHOOSE VALUE BETWEEN %d and  %d", y_stepper_p->min_position, y_stepper_p->max_position); 
-        } 
+            ESP_LOGI(TAG, "INVALID Y STEPPER INPUT, CHOOSE VALUE BETWEEN %d and"
+                    "%d", y_stepper_p->min_position, y_stepper_p->max_position);
+        }
     } else{
         ESP_LOGI(TAG, "INVALID DEVICE INPUT");
     }
-    
+
     if (read_device){
-        ESP_LOGI(TAG, "RESPONDING WITH CURRENT VALUE OF DEVICE: %s is %d", device, device_value);
+        ESP_LOGI(TAG, "RESPONDING WITH CURRENT VALUE OF DEVICE: %s is %d",
+                device, device_value);
     } else if (device_value == -2){
         ESP_LOGI(TAG, "NO INPUT VALUE IN GET REQUEST!");
     }
+
 
     struct tm* current_time = get_current_time(now_p);
     char resp_str[32];
     sprintf(resp_str, "%d", current_time->tm_year);
     free(current_time);
 
-        //device_value_str; //strcat(strcat("DEVICE: ", device), strcat("VALUE: ", device_value_str));//(const char*) req->user_ctx;
+        //device_value_str; //strcat(strcat("DEVICE: ", device),
+        //strcat("VALUE: ", device_value_str));//(const char*) req->user_ctx;
     /* Set some custom headers */
     if(strcmp(device, "not_selected") != 0){
         httpd_resp_set_hdr(req, "DEVICE: ", device);
     }
-   
+
     httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
 
     /* After sending the HTTP response the old HTTP request
@@ -333,20 +353,24 @@ static const httpd_uri_t echo = {
 esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err)
 {
     if (strcmp("/hello", req->uri) == 0) {
-        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "/hello uri is not available");
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND,
+                "/hello uri is not available");
         /* return esp_ok to keep underlying socket open */
         return ESP_OK;
     } else if (strcmp("/get", req->uri) == 0) {
-        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "/get uri is not available");
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND,
+                "/get uri is not available");
         /* return esp_ok to keep underlying socket open */
         return ESP_OK;
     } else if (strcmp("/echo", req->uri) == 0) {
-        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "/echo URI is not available");
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND,
+                "/echo URI is not available");
         /* Return ESP_FAIL to close underlying socket */
         return ESP_FAIL;
     }
     /* For any other URI send 404 and close socket */
-    httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Some 404 error message");
+    httpd_resp_send_err(req, HTTPD_404_NOT_FOUND,
+            "Some 404 error message");
     return ESP_FAIL;
 }
 
@@ -372,7 +396,8 @@ static esp_err_t ctrl_put_handler(httpd_req_t *req)
         httpd_unregister_uri(req->handle, "/get");
         httpd_unregister_uri(req->handle, "/echo");
         /* Register the custom error handler */
-        httpd_register_err_handler(req->handle, HTTPD_404_NOT_FOUND, http_404_error_handler);
+        httpd_register_err_handler(req->handle, HTTPD_404_NOT_FOUND,
+                http_404_error_handler);
     }
     else {
         ESP_LOGI(TAG, "Registering /hello, /get, and /echo URIs");
@@ -445,64 +470,71 @@ static void connect_handler(void* arg, esp_event_base_t event_base,
 
 void app_main(void)
 {
-
     static httpd_handle_t server = NULL;
 
+    /* Create event queue of endstop structs for endstop interrupts */
     evt_queue = xQueueCreate(20, sizeof(endstop_t));
     if(evt_queue == NULL){
         ESP_LOGE(TAG, "FAILED TO CREATE INTERRUPT QUEUE!");
         exit(1);
     }
 
-    now_p = real_time_init();
-
+    /* Initialize Relay GPIO pins */
     setup_gpio();
 
+    /* Initialize Stepper Motors */
     z_stepper_p = init_stepper();
-    config_stepper(z_stepper_p, "Z Stepper", STEPPER_PWM_LS_TIMER, Z_PWM_LS_CHANNEL, Z_DIR_GPIO, Z_PWM_LS_GPIO, Z_EN_GPIO, 2000, 0);
+    config_stepper(z_stepper_p, "Z Stepper", STEPPER_PWM_LS_TIMER,
+            Z_PWM_LS_CHANNEL, Z_DIR_GPIO, Z_PWM_LS_GPIO, Z_EN_GPIO, 2000, 0);
     y_stepper_p = init_stepper();
-    config_stepper(y_stepper_p, "Y Stepper", STEPPER_PWM_LS_TIMER, Y_PWM_LS_CHANNEL, Y_DIR_GPIO, Y_PWM_LS_GPIO, Y_EN_GPIO, 4000, 0);
+    config_stepper(y_stepper_p, "Y Stepper", STEPPER_PWM_LS_TIMER,
+            Y_PWM_LS_CHANNEL, Y_DIR_GPIO, Y_PWM_LS_GPIO, Y_EN_GPIO, 4000, 0);
 
-    
+
+    /* Initialize Endstops */
     #ifdef ENDSTOP_MIN_Z
     endstop_t* z_endstop_min_p = init_endstop();
     if(z_endstop_min_p == NULL){
         printf("INIT_ENDSTOP RETURNED NULL!");
         exit(1);
-    } 
-    config_endstop("Z MIN ENDSTOP", z_endstop_min_p, z_stepper_p, Z_ENDSTOP_MIN_GPIO, 0, &evt_queue);
+    }
+    config_endstop("Z MIN ENDSTOP", z_endstop_min_p, z_stepper_p,
+            Z_ENDSTOP_MIN_GPIO, 0, &evt_queue);
     #endif
- 
+
     #ifdef ENDSTOP_MAX_Z
     endstop_t* z_endstop_max_p = init_endstop();
     if(z_endstop_max_p == NULL){
         printf("INIT_ENDSTOP RETURNED NULL!");
         exit(1);
-    } 
-    config_endstop("Z MAX ENDSTOP", z_endstop_max_p, z_stepper_p, Z_ENDSTOP_MAX_GPIO, 0, &evt_queue);
+    }
+    config_endstop("Z MAX ENDSTOP", z_endstop_max_p, z_stepper_p,
+            Z_ENDSTOP_MAX_GPIO, 0, &evt_queue);
     #endif
-   
+
     #ifdef ENDSTOP_MIN_Y
     endstop_t* y_endstop_min_p = init_endstop();
     if(y_endstop_min_p == NULL){
         printf("INIT_ENDSTOP RETURNED NULL!");
         exit(1);
-    } 
-    config_endstop("Y MIN ENDSTOP", y_endstop_min_p, y_stepper_p, Y_ENDSTOP_MIN_GPIO, 0, &evt_queue);
+    }
+    config_endstop("Y MIN ENDSTOP", y_endstop_min_p, y_stepper_p, Y_
+            ENDSTOP_MIN_GPIO, 0, &evt_queue);
     #endif
-   
+
     #ifdef ENDSTOP_MAX_Y
     endstop_t* y_endstop_max_p = init_endstop();
     if(y_endstop_max_p == NULL){
         printf("INIT_ENDSTOP RETURNED NULL!");
         exit(1);
-    } 
-    config_endstop("Y MAX ENDSTOP", y_endstop_max_p, y_stepper_p, Y_ENDSTOP_MAX_GPIO, 0, &evt_queue);
+    }
+    config_endstop("Y MAX ENDSTOP", y_endstop_max_p, y_stepper_p,
+            Y_ENDSTOP_MAX_GPIO, 0, &evt_queue);
     #endif
-    
-    //create endstop task
-    TaskHandle_t endstop_taskHandle = (TaskHandle_t) xTaskCreate(endstop_task, "es_task", 4096, NULL, 10, NULL);
-    
+
+    /*TaskHandle_t endstop_taskHandle = (TaskHandle_t) */
+    xTaskCreate(endstop_task, "es_task", 4096, NULL, 10, NULL); //create endstop task
+
     #ifdef ENDSTOP_MIN_Z
         z_endstop_min_p->endstop_taskHandle = endstop_taskHandle;
     #endif
@@ -519,22 +551,28 @@ void app_main(void)
     gpio_install_isr_service(/*ENDSTOP_INTR_FLAG*/ESP_INTR_FLAG_DEFAULT); //install gpio isr service
 
     #ifdef ENDSTOP_MIN_Z
-        gpio_isr_handler_add(z_endstop_min_p->gpio, gpio_isr_handler, (void *) z_endstop_min_p);
+        gpio_isr_handler_add(z_endstop_min_p->gpio, gpio_isr_handler,
+                (void *) z_endstop_min_p);
     #endif
     #ifdef ENDSTOP_MAX_Z
-        gpio_isr_handler_add(z_endstop_max_p->gpio, gpio_isr_handler, (void *) z_endstop_max_p);
+        gpio_isr_handler_add(z_endstop_max_p->gpio, gpio_isr_handler,
+                (void *) z_endstop_max_p);
     #endif
     #ifdef ENDSTOP_MIN_Y
-        gpio_isr_handler_add(y_endstop_min_p->gpio, gpio_isr_handler, (void *) y_endstop_min_p);
+        gpio_isr_handler_add(y_endstop_min_p->gpio, gpio_isr_handler,
+                (void *) y_endstop_min_p);
     #endif
     #ifdef ENDSTOP_MAX_Y
-        gpio_isr_handler_add(y_endstop_max_p->gpio, gpio_isr_handler, (void *) y_endstop_max_p);
+        gpio_isr_handler_add(y_endstop_max_p->gpio, gpio_isr_handler,
+                (void *) y_endstop_max_p);
     #endif
 
     fan_1_p = init_fan();
     fan_2_p = init_fan();
-    config_fan(fan_1_p, "Fan_1", FAN_1_PWM_LS_GPIO, FAN_PWM_DEFAULT_FREQUENCY, FAN_PWM_LS_TIMER, FAN_1_PWM_LS_CHANNEL);
-    config_fan(fan_2_p, "Fan_2", FAN_2_PWM_LS_GPIO, FAN_PWM_DEFAULT_FREQUENCY, FAN_PWM_LS_TIMER, FAN_2_PWM_LS_CHANNEL);
+    config_fan(fan_1_p, "Fan_1", FAN_1_PWM_LS_GPIO, FAN_PWM_DEFAULT_FREQUENCY,
+            FAN_PWM_LS_TIMER, FAN_1_PWM_LS_CHANNEL);
+    config_fan(fan_2_p, "Fan_2", FAN_2_PWM_LS_GPIO, FAN_PWM_DEFAULT_FREQUENCY,
+            FAN_PWM_LS_TIMER, FAN_2_PWM_LS_CHANNEL);
 
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_netif_init());
@@ -549,9 +587,21 @@ void app_main(void)
     /* Register event handlers to stop the server when Wi-Fi is disconnected,
      * and re-start it upon connection.
      */
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &connect_handler, &server));
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &disconnect_handler, &server));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT,
+                IP_EVENT_STA_GOT_IP, &connect_handler, &server));
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT,
+                WIFI_EVENT_STA_DISCONNECTED, &disconnect_handler, &server));
 
     /* Start the server for the first time */
     server = start_webserver();
+
+    /* Initialize Real Time Clock */
+    now_p = real_time_init();
+
+    struct tm* current_time = get_current_time(now_p);
+    char resp_str[32];
+    sprintf(resp_str, "%d", current_time->tm_year);
+    free(current_time);
+
+
 }

@@ -10,11 +10,11 @@ menu "MiGroBox GPIO RELAY Configuration"
             Some GPIOs are used for other purposes (flash connections, etc.) and cannot be used to control relays.
 
             GPIOs 35-39 are input-only so cannot be used as outputs.
-    
+
     config PUMP_RELAY_GPIO
         int "Pump relay GPIO number"
         range 0 34
-        default 5
+        default 6
         help
             GPIO number (IOxx) to turn on and off.
 
@@ -24,3 +24,36 @@ menu "MiGroBox GPIO RELAY Configuration"
 
 
 endmenu
+
+menu "MiGroBox Real Time Clock Configuration"
+
+    choice TIMEZONE_OPTIONS
+        prompt "Timezone selection"
+        optional
+        default EST
+        help
+            The Timezone string sets the real time clock environment to the selected TZ
+            The default timezone is Eastern Standard Time (EST)
+
+        config EST
+            bool "Eastern Standard Time"
+        config UTC
+            bool "Coordinated Universal Time"
+        config GMT
+            bool "Greenwich Mean Time"
+        config CUSTOM_TZ
+            bool "Custom Timezone"
+    endchoice
+
+    config CUSTOM_TZ_INPUT
+        string "Enter Custom POSIX Timezone" if CUSTOM_TZ
+
+    config TIMEZONE
+        string #Having prompt ruins it somehow - doesn't update value
+        default "EST" if EST
+        default "UTC" if UTC
+        default "GMT" if GMT
+        default CUSTOM_TZ_INPUT if CUSTOM_TZ
+
+endmenu
+

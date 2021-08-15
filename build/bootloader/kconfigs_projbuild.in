@@ -1,3 +1,4 @@
-source "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/bootloader/Kconfig.projbuild"
-source "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/esptool_py/Kconfig.projbuild"
-source "/Users/NicoleMoiseyev/Documents/Engineering/MiGroBox/ECE/esp/esp-idf/components/partition_table/Kconfig.projbuild"
+source "/Users/Lucas/Documents/Documents-Lucas_Moiseyev_MacBook_Pro/Dev/esp/esp-idf/components/bootloader/Kconfig.projbuild"
+source "/Users/Lucas/Documents/Documents-Lucas_Moiseyev_MacBook_Pro/Dev/esp/esp-idf/components/esp_rom/Kconfig.projbuild"
+source "/Users/Lucas/Documents/Documents-Lucas_Moiseyev_MacBook_Pro/Dev/esp/esp-idf/components/esptool_py/Kconfig.projbuild"
+source "/Users/Lucas/Documents/Documents-Lucas_Moiseyev_MacBook_Pro/Dev/esp/esp-idf/components/partition_table/Kconfig.projbuild"
